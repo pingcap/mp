@@ -98,8 +98,11 @@ func (c *Conn) writeInitialHandshake() error {
 	data = append(data, c.salt[8:]...)
 	//filter [00]
 	data = append(data, 0)
-
-	return c.writePacket(data)
+	err := c.writePacket(data)
+	if err != nil {
+		return err
+	}
+	return c.flush()
 }
 
 func (c *Conn) readPacket() ([]byte, error) {
