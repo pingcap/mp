@@ -8,7 +8,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
 	stats "github.com/ngaut/gostats"
-	log "github.com/ngaut/logging"
+	"github.com/ngaut/log"
 	"github.com/ngaut/tokenlimiter"
 	"github.com/pingcap/mp/protocol"
 	//	"github.com/pingcap/ql"

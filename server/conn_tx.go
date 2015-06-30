@@ -1,21 +1,21 @@
 package server
 
 import (
-	log "github.com/ngaut/logging"
-	"github.com/wandoulabs/cm/mysql"
+	"github.com/ngaut/log"
+	"github.com/pingcap/mp/protocol"
 )
 
 func (c *Conn) inTransaction() bool {
-	return c.status&mysql.SERVER_STATUS_IN_TRANS > 0
+	return c.status&protocol.SERVER_STATUS_IN_TRANS > 0
 }
 
 func (c *Conn) isAutoCommit() bool {
-	return c.status&mysql.SERVER_STATUS_AUTOCOMMIT > 0
+	return c.status&protocol.SERVER_STATUS_AUTOCOMMIT > 0
 }
 
 func (c *Conn) handleBegin() error {
 	log.Debug("handle begin")
-	c.status |= mysql.SERVER_STATUS_IN_TRANS
+	c.status |= protocol.SERVER_STATUS_IN_TRANS
 
 	return c.writeOkFlush()
 }
@@ -39,13 +39,13 @@ func (c *Conn) handleRollback() (err error) {
 }
 
 func (c *Conn) commit() (err error) {
-	c.status &= ^mysql.SERVER_STATUS_IN_TRANS
+	c.status &= ^protocol.SERVER_STATUS_IN_TRANS
 
 	return
 }
 
 func (c *Conn) rollback() (err error) {
-	c.status &= ^mysql.SERVER_STATUS_IN_TRANS
+	c.status &= ^protocol.SERVER_STATUS_IN_TRANS
 
 	return
 }
