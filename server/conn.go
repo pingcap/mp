@@ -10,7 +10,7 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
-	log "github.com/ngaut/logging"
+	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	"github.com/pingcap/mp/protocol"
 	"github.com/pingcap/ql"
