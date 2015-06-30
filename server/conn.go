@@ -260,8 +260,7 @@ func (c *Conn) writeOkFlush() error {
 	if err := c.writeOK(); err != nil {
 		return errors.Trace(err)
 	}
-	c.flush()
-	return nil
+	return errors.Trace(c.flush())
 }
 
 func (c *Conn) writeOK() error {
