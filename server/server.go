@@ -60,7 +60,6 @@ func (s *Server) newConn(co net.Conn) *Conn {
 		pkg:          protocol.NewPacketIO(co),
 		server:       s,
 		connectionId: atomic.AddUint32(&baseConnId, 1),
-		status:       protocol.SERVER_STATUS_AUTOCOMMIT,
 		collation:    protocol.DEFAULT_COLLATION_ID,
 		charset:      protocol.DEFAULT_CHARSET,
 		alloc:        arena.NewArenaAllocator(32 * 1024),
