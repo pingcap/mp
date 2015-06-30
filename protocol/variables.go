@@ -1,12 +1,9 @@
 package protocol
 
-import (
-	"strings"
-)
-
 const (
-	SCOPE_GLOBAL  = 1
-	SCOPE_SESSION = 2
+	SCOPE_NONE    = 0
+	SCOPE_GLOBAL  = 1 << 0
+	SCOPE_SESSION = 1 << 1
 )
 
 type VarInfo struct {
@@ -14,831 +11,504 @@ type VarInfo struct {
 	Value     string
 }
 
-var DefaultVariables map[string]VarInfo
-
-func init() {
-	DefaultVariables = make(map[string]VarInfo)
-	defaultLines := strings.Split(defaultVarStr, "\n")
-	for _, line := range defaultLines {
-		spaceIdx := strings.Index(line, " ")
-		if spaceIdx > 0 {
-			DefaultVariables[line[:spaceIdx]] = VarInfo{
-				Value: line[spaceIdx+1:],
-			}
-		}
-	}
-	scopeLines := strings.Split(variableScopeStr, "\n")
-	for _, line := range scopeLines {
-		spaceIdx := strings.Index(line, " ")
-		if spaceIdx > 0 {
-			varName := line[:spaceIdx]
-			varInfo := DefaultVariables[varName]
-			scopeSign := line[spaceIdx+1:]
-			switch scopeSign {
-			case "G":
-				varInfo.ScopeFlag = SCOPE_GLOBAL
-			case "S":
-				varInfo.ScopeFlag = SCOPE_SESSION
-			case "GS":
-				varInfo.ScopeFlag = SCOPE_GLOBAL | SCOPE_GLOBAL
-			}
-			DefaultVariables[varName] = varInfo
-		}
-	}
+var DefaultVariables = map[string]VarInfo{
+	"character_set_database":                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "latin1"},
+	"gtid_mode":                             VarInfo{SCOPE_GLOBAL, "OFF"},
+	"range_alloc_block_size":                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "4096"},
+	"check_proxy_users":                     VarInfo{SCOPE_GLOBAL, ""},
+	"insert_id":                             VarInfo{SCOPE_SESSION, ""},
+	"innodb_rollback_segments":              VarInfo{SCOPE_GLOBAL, "128"},
+	"max_delayed_threads":                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "20"},
+	"tmpdir":                                VarInfo{SCOPE_NONE, "/var/tmp/"},
+	"ndb_log_empty_epochs":                  VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_autoinc_lock_mode":              VarInfo{SCOPE_NONE, "1"},
+	"key_cache_division_limit":              VarInfo{SCOPE_GLOBAL, "100"},
+	"max_binlog_size":                       VarInfo{SCOPE_GLOBAL, "1073741824"},
+	"query_alloc_block_size":                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "8192"},
+	"server_uuid":                           VarInfo{SCOPE_NONE, "d530594e-1c86-11e5-878b-6b36ce6799ca"},
+	"binlog_error_action":                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "IGNORE_ERROR"},
+	"innodb_disable_sort_file_cache":        VarInfo{SCOPE_GLOBAL, "OFF"},
+	"log_bin_trust_function_creators":       VarInfo{SCOPE_GLOBAL, "OFF"},
+	"binlog_format":                         VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "STATEMENT"},
+	"innodb_sync_spin_loops":                VarInfo{SCOPE_GLOBAL, "30"},
+	"long_query_time":                       VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "10.000000"},
+	"optimizer_trace":                       VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "enabled=off,one_line=off"},
+	"transaction_allow_batching":            VarInfo{SCOPE_SESSION, ""},
+	"datadir":                               VarInfo{SCOPE_NONE, "/usr/local/mysql/data/"},
+	"have_query_cache":                      VarInfo{SCOPE_NONE, "YES"},
+	"have_symlink":                          VarInfo{SCOPE_NONE, "YES"},
+	"innodb_api_enable_binlog":              VarInfo{SCOPE_NONE, "OFF"},
+	"performance_schema_max_thread_classes": VarInfo{SCOPE_NONE, "50"},
+	"query_cache_wlock_invalidate":          VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"timed_mutexes":                         VarInfo{SCOPE_GLOBAL, "OFF"},
+	"character_set_client":                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "latin1"},
+	"default_tmp_storage_engine":            VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "InnoDB"},
+	"innodb_checksum_algorithm":             VarInfo{SCOPE_GLOBAL, "innodb"},
+	"max_binlog_cache_size":                 VarInfo{SCOPE_GLOBAL, "18446744073709547520"},
+	"max_write_lock_count":                  VarInfo{SCOPE_GLOBAL, "18446744073709551615"},
+	"pseudo_thread_id":                      VarInfo{SCOPE_SESSION, ""},
+	"innodb_stats_persistent_sample_pages":  VarInfo{SCOPE_GLOBAL, "20"},
+	"innodb_spin_wait_delay":                VarInfo{SCOPE_GLOBAL, "6"},
+	"sql_buffer_result":                     VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"version_compile_os":                    VarInfo{SCOPE_NONE, "osx10.8"},
+	"session_track_state_change":            VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"query_cache_type":                      VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"slave_load_tmpdir":                     VarInfo{SCOPE_NONE, "/var/tmp/"},
+	"sql_select_limit":                      VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "18446744073709551615"},
+	"log_syslog":                            VarInfo{SCOPE_GLOBAL, ""},
+	"max_allowed_packet":                    VarInfo{SCOPE_GLOBAL, "4194304"},
+	"performance_schema":                    VarInfo{SCOPE_NONE, "ON"},
+	"pid_file":                              VarInfo{SCOPE_NONE, "/usr/local/mysql/data/localhost.pid"},
+	"rpl_stop_slave_timeout":                VarInfo{SCOPE_GLOBAL, "31536000"},
+	"sql_notes":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"performance_schema_events_statements_history_long_size": VarInfo{SCOPE_NONE, "10000"},
+	"thread_handling":                                        VarInfo{SCOPE_NONE, "one-thread-per-connection"},
+	"innodb_monitor_reset":                                   VarInfo{SCOPE_GLOBAL, ""},
+	"binlog_checksum":                                        VarInfo{SCOPE_GLOBAL, "CRC32"},
+	"div_precision_increment":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "4"},
+	"max_prepared_stmt_count":                                VarInfo{SCOPE_GLOBAL, "16382"},
+	"open_files_limit":                                       VarInfo{SCOPE_NONE, "5000"},
+	"optimizer_search_depth":                                 VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "62"},
+	"ndb_show_foreign_key_mock_tables":                       VarInfo{SCOPE_GLOBAL, ""},
+	"validate_password_length":                               VarInfo{SCOPE_GLOBAL, ""},
+	"have_compress":                                          VarInfo{SCOPE_NONE, "YES"},
+	"innodb_cmp_per_index_enabled":                           VarInfo{SCOPE_GLOBAL, "OFF"},
+	"sql_warnings":                                           VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"rand_seed2":                                             VarInfo{SCOPE_SESSION, ""},
+	"innodb_rollback_on_timeout":                             VarInfo{SCOPE_NONE, "OFF"},
+	"log_backward_compatible_user_definitions":               VarInfo{SCOPE_GLOBAL, ""},
+	"license":                                 VarInfo{SCOPE_NONE, "GPL"},
+	"report_port":                             VarInfo{SCOPE_NONE, "3306"},
+	"log_error_verbosity":                     VarInfo{SCOPE_GLOBAL, ""},
+	"log_syslog_include_pid":                  VarInfo{SCOPE_GLOBAL, ""},
+	"ndb_force_send":                          VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"thread_concurrency":                      VarInfo{SCOPE_NONE, "10"},
+	"character_set_results":                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "latin1"},
+	"core_file":                               VarInfo{SCOPE_NONE, "OFF"},
+	"innodb_flush_neighbors":                  VarInfo{SCOPE_GLOBAL, "1"},
+	"innodb_force_recovery":                   VarInfo{SCOPE_NONE, "0"},
+	"innodb_purge_threads":                    VarInfo{SCOPE_NONE, "1"},
+	"flush_time":                              VarInfo{SCOPE_GLOBAL, "0"},
+	"innodb_use_sys_malloc":                   VarInfo{SCOPE_NONE, "ON"},
+	"max_seeks_for_key":                       VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "18446744073709551615"},
+	"identity":                                VarInfo{SCOPE_SESSION, ""},
+	"auto_increment_offset":                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "1"},
+	"skip_networking":                         VarInfo{SCOPE_NONE, "OFF"},
+	"innodb_force_load_corrupted":             VarInfo{SCOPE_NONE, "OFF"},
+	"lc_time_names":                           VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "en_US"},
+	"optimizer_trace_features":                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "greedy_search=on,range_optimizer=on,dynamic_range=on,repeated_subselect=on"},
+	"slave_compressed_protocol":               VarInfo{SCOPE_GLOBAL, "OFF"},
+	"big_tables":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"innodb_flush_log_at_trx_commit":          VarInfo{SCOPE_GLOBAL, "1"},
+	"innodb_log_files_in_group":               VarInfo{SCOPE_NONE, "2"},
+	"max_relay_log_size":                      VarInfo{SCOPE_GLOBAL, "0"},
+	"performance_schema_max_thread_instances": VarInfo{SCOPE_NONE, "402"},
+	"lc_messages":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "en_US"},
+	"lower_case_file_system":                  VarInfo{SCOPE_NONE, "ON"},
+	"max_binlog_stmt_cache_size":              VarInfo{SCOPE_GLOBAL, "18446744073709547520"},
+	"flush": VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_buffer_pool_dump_now":                  VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_file_per_table":                        VarInfo{SCOPE_GLOBAL, "ON"},
+	"innodb_max_purge_lag":                         VarInfo{SCOPE_GLOBAL, "0"},
+	"innodb_undo_logs":                             VarInfo{SCOPE_GLOBAL, "128"},
+	"last_insert_id":                               VarInfo{SCOPE_SESSION, ""},
+	"ndbinfo_max_rows":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"performance_schema_max_socket_instances":      VarInfo{SCOPE_NONE, "322"},
+	"relay_log_purge":                              VarInfo{SCOPE_GLOBAL, "ON"},
+	"slave_parallel_workers":                       VarInfo{SCOPE_GLOBAL, "0"},
+	"stored_program_cache":                         VarInfo{SCOPE_GLOBAL, "256"},
+	"executed_gtids_compression_period":            VarInfo{SCOPE_GLOBAL, ""},
+	"sync_master_info":                             VarInfo{SCOPE_GLOBAL, "10000"},
+	"rpl_semi_sync_master_trace_level":             VarInfo{SCOPE_GLOBAL, ""},
+	"collation_connection":                         VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "latin1_swedish_ci"},
+	"innodb_use_native_aio":                        VarInfo{SCOPE_NONE, "OFF"},
+	"performance_schema_setup_objects_size":        VarInfo{SCOPE_NONE, "100"},
+	"show_old_temporals":                           VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"storage_engine":                               VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "InnoDB"},
+	"show_compatibility_56":                        VarInfo{SCOPE_GLOBAL, ""},
+	"event_scheduler":                              VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_flush_log_at_timeout":                  VarInfo{SCOPE_GLOBAL, "1"},
+	"log_bin_use_v1_row_events":                    VarInfo{SCOPE_NONE, "OFF"},
+	"performance_schema_max_table_handles":         VarInfo{SCOPE_NONE, "4000"},
+	"time_format":                                  VarInfo{SCOPE_NONE, "%H:%i:%s"},
+	"validate_password_policy":                     VarInfo{SCOPE_GLOBAL, ""},
+	"concurrent_insert":                            VarInfo{SCOPE_GLOBAL, "AUTO"},
+	"performance_schema_events_waits_history_size": VarInfo{SCOPE_NONE, "10"},
+	"sql_log_off":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"innodb_undo_log_truncate":                     VarInfo{SCOPE_GLOBAL, ""},
+	"ndb_deferred_constraints":                     VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"rpl_semi_sync_master_wait_no_slave":           VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_compression_pad_pct_max":               VarInfo{SCOPE_GLOBAL, "50"},
+	"innodb_status_output_locks":                   VarInfo{SCOPE_GLOBAL, "OFF"},
+	"lc_messages_dir":                              VarInfo{SCOPE_NONE, "/usr/local/mysql-5.6.25-osx10.8-x86_64/share/"},
+	"log_error":                                    VarInfo{SCOPE_NONE, "/usr/local/mysql/data/localhost.err"},
+	"relay_log_recovery":                           VarInfo{SCOPE_NONE, "OFF"},
+	"pseudo_slave_mode":                            VarInfo{SCOPE_SESSION, ""},
+	"log_throttle_queries_not_using_indexes":       VarInfo{SCOPE_GLOBAL, "0"},
+	"max_join_size":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "18446744073709551615"},
+	"max_length_for_sort_data":                     VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "1024"},
+	"query_cache_limit":                            VarInfo{SCOPE_GLOBAL, "1048576"},
+	"innodb_optimize_point_storage":                VarInfo{SCOPE_SESSION, ""},
+	"bulk_insert_buffer_size":                      VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "8388608"},
+	"innodb_log_file_size":                         VarInfo{SCOPE_NONE, "50331648"},
+	"innodb_lru_scan_depth":                        VarInfo{SCOPE_GLOBAL, "1024"},
+	"ndb_log_binlog_index":                         VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_ft_total_cache_size":                   VarInfo{SCOPE_NONE, "640000000"},
+	"socket":                                       VarInfo{SCOPE_NONE, "/tmp/mysql.sock"},
+	"max_points_in_geometry":                       VarInfo{SCOPE_GLOBAL, ""},
+	"ndb_distribution":                             VarInfo{SCOPE_GLOBAL, ""},
+	"rbr_exec_mode":                                VarInfo{SCOPE_SESSION, ""},
+	"keep_files_on_create":                         VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"performance_schema_max_cond_instances":        VarInfo{SCOPE_NONE, "3504"},
+	"sql_mode":                                     VarInfo{SCOPE_NONE, "STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION"},
+	"innodb_ft_cache_size":                         VarInfo{SCOPE_NONE, "8000000"},
+	"performance_schema_max_statement_classes":     VarInfo{SCOPE_NONE, "168"},
+	"protocol_version":                             VarInfo{SCOPE_NONE, "10"},
+	"query_prealloc_size":                          VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "8192"},
+	"locked_in_memory":                             VarInfo{SCOPE_NONE, "OFF"},
+	"performance_schema_max_mutex_instances":       VarInfo{SCOPE_NONE, "15906"},
+	"group_concat_max_len":                         VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "1024"},
+	"innodb_write_io_threads":                      VarInfo{SCOPE_NONE, "4"},
+	"transaction_alloc_block_size":                 VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "8192"},
+	"ndb_index_stat_option":                        VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"log_syslog_tag":                               VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_stats_sample_pages":                    VarInfo{SCOPE_GLOBAL, "8"},
+	"myisam_data_pointer_size":                     VarInfo{SCOPE_GLOBAL, "6"},
+	"myisam_mmap_size":                             VarInfo{SCOPE_NONE, "18446744073709551615"},
+	"performance_schema_max_mutex_classes":         VarInfo{SCOPE_NONE, "200"},
+	"server_id":                                    VarInfo{SCOPE_GLOBAL, "0"},
+	"ft_boolean_syntax":                            VarInfo{SCOPE_GLOBAL, "+ -><()~*:\"\"&|"},
+	"innodb_buffer_pool_load_now":                  VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_buffer_pool_size":                      VarInfo{SCOPE_GLOBAL, "134217728"},
+	"innodb_commit_concurrency":                    VarInfo{SCOPE_GLOBAL, "0"},
+	"slave_rows_search_algorithms":                 VarInfo{SCOPE_GLOBAL, "TABLE_SCAN,INDEX_SCAN"},
+	"eq_range_index_dive_limit":                    VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "10"},
+	"slave_exec_mode":                              VarInfo{SCOPE_GLOBAL, "STRICT"},
+	"innodb_fast_shutdown":                         VarInfo{SCOPE_GLOBAL, "1"},
+	"innodb_thread_concurrency":                    VarInfo{SCOPE_GLOBAL, "0"},
+	"max_sort_length":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "1024"},
+	"myisam_use_mmap":                              VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_ft_user_stopword_table":                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"innodb_read_io_threads":                       VarInfo{SCOPE_NONE, "4"},
+	"performance_schema_max_rwlock_instances":      VarInfo{SCOPE_NONE, "9102"},
+	"character_set_filesystem":                     VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "binary"},
+	"myisam_recover_options":                       VarInfo{SCOPE_NONE, "OFF"},
+	"new": VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"innodb_log_write_ahead_size":                   VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_undo_tablespaces":                       VarInfo{SCOPE_NONE, "0"},
+	"performance_schema_hosts_size":                 VarInfo{SCOPE_NONE, "100"},
+	"ft_min_word_len":                               VarInfo{SCOPE_NONE, "4"},
+	"skip_external_locking":                         VarInfo{SCOPE_NONE, "ON"},
+	"wait_timeout":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "28800"},
+	"innodb_monitor_disable":                        VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_adaptive_max_sleep_delay":               VarInfo{SCOPE_GLOBAL, "150000"},
+	"table_definition_cache":                        VarInfo{SCOPE_GLOBAL, "1400"},
+	"slave_net_timeout":                             VarInfo{SCOPE_GLOBAL, "3600"},
+	"sync_binlog":                                   VarInfo{SCOPE_GLOBAL, "0"},
+	"tx_read_only":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"innodb_buffer_pool_filename":                   VarInfo{SCOPE_GLOBAL, "ib_buffer_pool"},
+	"log_warnings":                                  VarInfo{SCOPE_GLOBAL, "1"},
+	"ndb_join_pushdown":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"table_open_cache":                              VarInfo{SCOPE_GLOBAL, "2000"},
+	"have_geometry":                                 VarInfo{SCOPE_NONE, "YES"},
+	"innodb_file_format":                            VarInfo{SCOPE_GLOBAL, "Antelope"},
+	"innodb_read_ahead_threshold":                   VarInfo{SCOPE_GLOBAL, "56"},
+	"local_infile":                                  VarInfo{SCOPE_GLOBAL, "ON"},
+	"skip_name_resolve":                             VarInfo{SCOPE_NONE, "OFF"},
+	"collation_database":                            VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "latin1_swedish_ci"},
+	"have_profiling":                                VarInfo{SCOPE_NONE, "YES"},
+	"slave_allow_batching":                          VarInfo{SCOPE_GLOBAL, "OFF"},
+	"slave_skip_errors":                             VarInfo{SCOPE_NONE, "OFF"},
+	"table_open_cache_instances":                    VarInfo{SCOPE_NONE, "1"},
+	"internal_tmp_disk_storage_engine":              VarInfo{SCOPE_GLOBAL, ""},
+	"offline_mode":                                  VarInfo{SCOPE_GLOBAL, ""},
+	"basedir":                                       VarInfo{SCOPE_NONE, "/usr/local/mysql"},
+	"init_connect":                                  VarInfo{SCOPE_GLOBAL, ""},
+	"performance_schema_max_rwlock_classes":         VarInfo{SCOPE_NONE, "40"},
+	"character_set_system":                          VarInfo{SCOPE_NONE, "utf8"},
+	"innodb_old_blocks_time":                        VarInfo{SCOPE_GLOBAL, "1000"},
+	"performance_schema_events_stages_history_size": VarInfo{SCOPE_NONE, "10"},
+	"optimizer_trace_max_mem_size":                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "16384"},
+	"foreign_key_checks":                            VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"net_retry_count":                               VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "10"},
+	"ndbinfo_show_hidden":                           VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"binlog_row_image":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "FULL"},
+	"innodb_api_enable_mdl":                         VarInfo{SCOPE_NONE, "OFF"},
+	"max_insert_delayed_threads":                    VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "20"},
+	"port": VarInfo{SCOPE_NONE, "3306"},
+	"simplified_binlog_gtid_recovery":                    VarInfo{SCOPE_NONE, "OFF"},
+	"innodb_adaptive_hash_index":                         VarInfo{SCOPE_GLOBAL, "ON"},
+	"innodb_api_disable_rowlock":                         VarInfo{SCOPE_NONE, "OFF"},
+	"innodb_flushing_avg_loops":                          VarInfo{SCOPE_GLOBAL, "30"},
+	"key_cache_block_size":                               VarInfo{SCOPE_GLOBAL, "1024"},
+	"innodb_purge_rseg_truncate_frequency":               VarInfo{SCOPE_GLOBAL, ""},
+	"character_set_server":                               VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "latin1"},
+	"innodb_api_trx_level":                               VarInfo{SCOPE_GLOBAL, "0"},
+	"net_read_timeout":                                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "30"},
+	"init_slave":                                         VarInfo{SCOPE_GLOBAL, ""},
+	"old_passwords":                                      VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "0"},
+	"skip_show_database":                                 VarInfo{SCOPE_NONE, "OFF"},
+	"binlog_stmt_cache_size":                             VarInfo{SCOPE_GLOBAL, "32768"},
+	"log_slow_slave_statements":                          VarInfo{SCOPE_GLOBAL, "OFF"},
+	"net_buffer_length":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "16384"},
+	"read_rnd_buffer_size":                               VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "262144"},
+	"relay_log_info_file":                                VarInfo{SCOPE_NONE, "relay-log.info"},
+	"large_pages":                                        VarInfo{SCOPE_NONE, "OFF"},
+	"plugin_dir":                                         VarInfo{SCOPE_NONE, "/usr/local/mysql/lib/plugin/"},
+	"slow_launch_time":                                   VarInfo{SCOPE_GLOBAL, "2"},
+	"performance_schema_digests_size":                    VarInfo{SCOPE_NONE, "10000"},
+	"sync_relay_log":                                     VarInfo{SCOPE_GLOBAL, "10000"},
+	"log_timestamps":                                     VarInfo{SCOPE_GLOBAL, ""},
+	"binlog_gtid_simple_recovery":                        VarInfo{SCOPE_NONE, "OFF"},
+	"large_files_support":                                VarInfo{SCOPE_NONE, "ON"},
+	"performance_schema_session_connect_attrs_size":      VarInfo{SCOPE_NONE, "512"},
+	"version_comment":                                    VarInfo{SCOPE_NONE, "MySQL Community Server (GPL)"},
+	"ndb_blob_write_batch_bytes":                         VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"innodb_adaptive_flushing":                           VarInfo{SCOPE_GLOBAL, "ON"},
+	"myisam_sort_buffer_size":                            VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "8388608"},
+	"sql_slave_skip_counter":                             VarInfo{SCOPE_GLOBAL, "0"},
+	"session_track_system_variables":                     VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"innodb_ft_enable_stopword":                          VarInfo{SCOPE_GLOBAL, "ON"},
+	"innodb_page_size":                                   VarInfo{SCOPE_NONE, "16384"},
+	"metadata_locks_hash_instances":                      VarInfo{SCOPE_NONE, "8"},
+	"binlog_max_flush_queue_time":                        VarInfo{SCOPE_GLOBAL, "0"},
+	"have_openssl":                                       VarInfo{SCOPE_NONE, "DISABLED"},
+	"innodb_compression_failure_threshold_pct":           VarInfo{SCOPE_GLOBAL, "5"},
+	"preload_buffer_size":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "32768"},
+	"rewriter_enabled":                                   VarInfo{SCOPE_GLOBAL, ""},
+	"performance_schema_max_file_handles":                VarInfo{SCOPE_NONE, "32768"},
+	"validate_password_mixed_case_count":                 VarInfo{SCOPE_GLOBAL, ""},
+	"general_log_file":                                   VarInfo{SCOPE_GLOBAL, "/usr/local/mysql/data/localhost.log"},
+	"innodb_random_read_ahead":                           VarInfo{SCOPE_GLOBAL, "OFF"},
+	"profiling_history_size":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "15"},
+	"ndb_index_stat_enable":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"enforce_gtid_consistency":                           VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_api_bk_commit_interval":                      VarInfo{SCOPE_GLOBAL, "5"},
+	"innodb_stats_persistent":                            VarInfo{SCOPE_GLOBAL, "ON"},
+	"validate_password_number_count":                     VarInfo{SCOPE_GLOBAL, ""},
+	"query_cache_min_res_unit":                           VarInfo{SCOPE_GLOBAL, "4096"},
+	"innodb_monitor_enable":                              VarInfo{SCOPE_GLOBAL, ""},
+	"connect_timeout":                                    VarInfo{SCOPE_GLOBAL, "10"},
+	"delayed_insert_limit":                               VarInfo{SCOPE_GLOBAL, "100"},
+	"innodb_ft_result_cache_limit":                       VarInfo{SCOPE_GLOBAL, "2000000000"},
+	"interactive_timeout":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "28800"},
+	"performance_schema_accounts_size":                   VarInfo{SCOPE_NONE, "100"},
+	"rpl_semi_sync_slave_trace_level":                    VarInfo{SCOPE_GLOBAL, ""},
+	"auto_increment_increment":                           VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "1"},
+	"date_format":                                        VarInfo{SCOPE_NONE, "%Y-%m-%d"},
+	"innodb_checksums":                                   VarInfo{SCOPE_NONE, "ON"},
+	"secure_auth":                                        VarInfo{SCOPE_GLOBAL, "ON"},
+	"thread_cache_size":                                  VarInfo{SCOPE_GLOBAL, "9"},
+	"max_sp_recursion_depth":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "0"},
+	"ignore_builtin_innodb":                              VarInfo{SCOPE_NONE, "OFF"},
+	"log_slave_updates":                                  VarInfo{SCOPE_NONE, "OFF"},
+	"innodb_fill_factor":                                 VarInfo{SCOPE_GLOBAL, ""},
+	"mysql_native_password_proxy_users":                  VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_adaptive_flushing_lwm":                       VarInfo{SCOPE_GLOBAL, "10"},
+	"innodb_concurrency_tickets":                         VarInfo{SCOPE_GLOBAL, "5000"},
+	"innodb_ft_sort_pll_degree":                          VarInfo{SCOPE_NONE, "2"},
+	"log_slow_admin_statements":                          VarInfo{SCOPE_GLOBAL, "OFF"},
+	"relay_log_space_limit":                              VarInfo{SCOPE_NONE, "0"},
+	"rpl_semi_sync_master_timeout":                       VarInfo{SCOPE_GLOBAL, ""},
+	"validate_password_special_char_count":               VarInfo{SCOPE_GLOBAL, ""},
+	"ft_stopword_file":                                   VarInfo{SCOPE_NONE, "(built-in)"},
+	"innodb_large_prefix":                                VarInfo{SCOPE_GLOBAL, "OFF"},
+	"slave_checkpoint_group":                             VarInfo{SCOPE_GLOBAL, "512"},
+	"slave_transaction_retries":                          VarInfo{SCOPE_GLOBAL, "10"},
+	"ndb_table_no_logging":                               VarInfo{SCOPE_SESSION, ""},
+	"slave_max_allowed_packet":                           VarInfo{SCOPE_GLOBAL, "1073741824"},
+	"rpl_semi_sync_master_enabled":                       VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_monitor_reset_all":                           VarInfo{SCOPE_GLOBAL, ""},
+	"automatic_sp_privileges":                            VarInfo{SCOPE_GLOBAL, "ON"},
+	"character_set_connection":                           VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "latin1"},
+	"have_ssl":                                           VarInfo{SCOPE_NONE, "DISABLED"},
+	"multi_range_count":                                  VarInfo{SCOPE_NONE, "256"},
+	"innodb_ft_server_stopword_table":                    VarInfo{SCOPE_GLOBAL, ""},
+	"profiling":                                          VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"max_statement_time":                                 VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"binlog_cache_size":                                  VarInfo{SCOPE_GLOBAL, "32768"},
+	"innodb_log_group_home_dir":                          VarInfo{SCOPE_NONE, "./"},
+	"innodb_sort_buffer_size":                            VarInfo{SCOPE_NONE, "1048576"},
+	"key_cache_age_threshold":                            VarInfo{SCOPE_GLOBAL, "300"},
+	"performance_schema_max_file_instances":              VarInfo{SCOPE_NONE, "7693"},
+	"collation_server":                                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "latin1_swedish_ci"},
+	"innodb_buffer_pool_instances":                       VarInfo{SCOPE_NONE, "8"},
+	"innodb_stats_method":                                VarInfo{SCOPE_GLOBAL, "nulls_equal"},
+	"innodb_replication_delay":                           VarInfo{SCOPE_GLOBAL, "0"},
+	"innodb_status_output":                               VarInfo{SCOPE_GLOBAL, "OFF"},
+	"min_examined_row_limit":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "0"},
+	"sql_log_bin":                                        VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"optimizer_switch":                                   VarInfo{SCOPE_NONE, "index_merge=on,index_merge_union=on,index_merge_sort_union=on,index_merge_intersection=on,engine_condition_pushdown=on,index_condition_pushdown=on,mrr=on,mrr_cost_based=on,block_nested_loop=on,batched_key_access=off,materialization=on,semijoin=on,loosescan=on,firstmatch=on,subquery_materialization_cost_based=on,use_index_extensions=on"},
+	"server_id_bits":                                     VarInfo{SCOPE_NONE, "32"},
+	"lower_case_table_names":                             VarInfo{SCOPE_NONE, "2"},
+	"myisam_repair_threads":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "1"},
+	"old_alter_table":                                    VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"sha256_password_proxy_users":                        VarInfo{SCOPE_GLOBAL, ""},
+	"default_storage_engine":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "InnoDB"},
+	"host_cache_size":                                    VarInfo{SCOPE_GLOBAL, "279"},
+	"innodb_version":                                     VarInfo{SCOPE_NONE, "5.6.25"},
+	"performance_schema_max_cond_classes":                VarInfo{SCOPE_NONE, "80"},
+	"log_syslog_facility":                                VarInfo{SCOPE_GLOBAL, ""},
+	"have_dynamic_loading":                               VarInfo{SCOPE_NONE, "YES"},
+	"myisam_max_sort_file_size":                          VarInfo{SCOPE_GLOBAL, "9223372036853727232"},
+	"sql_quote_show_create":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"slave_preserve_commit_order":                        VarInfo{SCOPE_GLOBAL, ""},
+	"join_buffer_size":                                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "262144"},
+	"performance_schema_max_socket_classes":              VarInfo{SCOPE_NONE, "10"},
+	"read_only":                                          VarInfo{SCOPE_GLOBAL, "OFF"},
+	"max_tmp_tables":                                     VarInfo{SCOPE_NONE, "32"},
+	"rpl_semi_sync_slave_enabled":                        VarInfo{SCOPE_GLOBAL, ""},
+	"binlog_direct_non_transactional_updates":            VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"myisam_stats_method":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "nulls_unequal"},
+	"performance_schema_max_table_instances":             VarInfo{SCOPE_NONE, "12500"},
+	"innodb_log_checksum_algorithm":                      VarInfo{SCOPE_GLOBAL, ""},
+	"end_markers_in_json":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"innodb_data_file_path":                              VarInfo{SCOPE_NONE, "ibdata1:12M:autoextend"},
+	"max_connections":                                    VarInfo{SCOPE_GLOBAL, "151"},
+	"performance_schema_events_stages_history_long_size": VarInfo{SCOPE_NONE, "10000"},
+	"slave_pending_jobs_size_max":                        VarInfo{SCOPE_GLOBAL, "16777216"},
+	"block_encryption_mode":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "aes-128-ecb"},
+	"default_week_format":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "0"},
+	"log_output":                                         VarInfo{SCOPE_NONE, "FILE"},
+	"avoid_temporal_upgrade":                             VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_change_buffer_max_size":                      VarInfo{SCOPE_GLOBAL, "25"},
+	"max_error_count":                                    VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "64"},
+	"innodb_max_undo_log_size":                           VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_file_format_max":                             VarInfo{SCOPE_GLOBAL, "Antelope"},
+	"innodb_undo_directory":                              VarInfo{SCOPE_NONE, "."},
+	"net_write_timeout":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "60"},
+	"rpl_semi_sync_master_wait_point":                    VarInfo{SCOPE_GLOBAL, ""},
+	"max_user_connections":                               VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "0"},
+	"old": VarInfo{SCOPE_NONE, "OFF"},
+	"performance_schema_events_statements_history_size": VarInfo{SCOPE_NONE, "10"},
+	"unique_checks":                                     VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"rewriter_verbose":                                  VarInfo{SCOPE_GLOBAL, ""},
+	"sql_safe_updates":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"explicit_defaults_for_timestamp":                   VarInfo{SCOPE_NONE, "OFF"},
+	"general_log":                                       VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_mirrored_log_groups":                        VarInfo{SCOPE_NONE, "1"},
+	"performance_schema_events_waits_history_long_size": VarInfo{SCOPE_NONE, "10000"},
+	"performance_schema_users_size":                     VarInfo{SCOPE_NONE, "100"},
+	"version_compile_machine":                           VarInfo{SCOPE_NONE, "x86_64"},
+	"super_read_only":                                   VarInfo{SCOPE_GLOBAL, ""},
+	"sync_relay_log_info":                               VarInfo{SCOPE_GLOBAL, "10000"},
+	"time_zone":                                         VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "SYSTEM"},
+	"rand_seed1":                                        VarInfo{SCOPE_SESSION, ""},
+	"ft_query_expansion_limit":                          VarInfo{SCOPE_NONE, "20"},
+	"innodb_ft_min_token_size":                          VarInfo{SCOPE_NONE, "3"},
+	"innodb_lock_wait_timeout":                          VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "50"},
+	"innodb_optimize_fulltext_only":                     VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_support_xa":                                 VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"delay_key_write":                                   VarInfo{SCOPE_GLOBAL, "ON"},
+	"max_connect_errors":                                VarInfo{SCOPE_GLOBAL, "100"},
+	"innodb_max_purge_lag_delay":                        VarInfo{SCOPE_GLOBAL, "0"},
+	"slow_query_log_file":                               VarInfo{SCOPE_GLOBAL, "/usr/local/mysql/data/localhost-slow.log"},
+	"innodb_buffer_pool_dump_pct":                       VarInfo{SCOPE_GLOBAL, ""},
+	"bind_address":                                      VarInfo{SCOPE_NONE, "*"},
+	"innodb_doublewrite":                                VarInfo{SCOPE_NONE, "ON"},
+	"innodb_max_dirty_pages_pct_lwm":                    VarInfo{SCOPE_GLOBAL, "0"},
+	"lock_wait_timeout":                                 VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "31536000"},
+	"low_priority_updates":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"debug":                                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"ndb_optimization_delay":                            VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_buffer_pool_load_abort":                     VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_sync_array_size":                            VarInfo{SCOPE_NONE, "1"},
+	"large_page_size":                                   VarInfo{SCOPE_NONE, "0"},
+	"slave_sql_verify_checksum":                         VarInfo{SCOPE_GLOBAL, "ON"},
+	"tmp_table_size":                                    VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "16777216"},
+	"disconnect_on_expired_password":                    VarInfo{SCOPE_NONE, "ON"},
+	"hostname":                                          VarInfo{SCOPE_NONE, "localhost"},
+	"innodb_stats_on_metadata":                          VarInfo{SCOPE_GLOBAL, "OFF"},
+	"system_time_zone":                                  VarInfo{SCOPE_NONE, "CST"},
+	"innodb_compression_level":                          VarInfo{SCOPE_GLOBAL, "6"},
+	"default_password_lifetime":                         VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_max_dirty_pages_pct":                        VarInfo{SCOPE_GLOBAL, "75"},
+	"performance_schema_max_file_classes":               VarInfo{SCOPE_NONE, "50"},
+	"slave_checkpoint_period":                           VarInfo{SCOPE_GLOBAL, "300"},
+	"session_track_schema":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"performance_schema_max_stage_classes":              VarInfo{SCOPE_NONE, "150"},
+	"thread_stack":                                      VarInfo{SCOPE_NONE, "262144"},
+	"validate_password_dictionary_file":                 VarInfo{SCOPE_GLOBAL, ""},
+	"performance_schema_setup_actors_size":              VarInfo{SCOPE_NONE, "100"},
+	"slow_query_log":                                    VarInfo{SCOPE_GLOBAL, "OFF"},
+	"sync_frm":                                          VarInfo{SCOPE_GLOBAL, "ON"},
+	"autocommit":                                        VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"have_rtree_keys":                                   VarInfo{SCOPE_NONE, "YES"},
+	"innodb_change_buffering":                           VarInfo{SCOPE_GLOBAL, "all"},
+	"innodb_io_capacity":                                VarInfo{SCOPE_GLOBAL, "200"},
+	"key_buffer_size":                                   VarInfo{SCOPE_GLOBAL, "8388608"},
+	"transaction_write_set_extraction":                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"expire_logs_days":                                  VarInfo{SCOPE_GLOBAL, "0"},
+	"innodb_io_capacity_max":                            VarInfo{SCOPE_GLOBAL, "2000"},
+	"innodb_strict_mode":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"sql_big_selects":                                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"binlog_group_commit_sync_delay":                    VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_buffer_pool_load_at_startup":                VarInfo{SCOPE_NONE, "OFF"},
+	"optimizer_trace_limit":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "1"},
+	"updatable_views_with_limit":                        VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "YES"},
+	"ndb_recv_thread_cpu_mask":                          VarInfo{SCOPE_NONE, ""},
+	"debug_sync":                                        VarInfo{SCOPE_SESSION, ""},
+	"innodb_create_intrinsic":                           VarInfo{SCOPE_SESSION, ""},
+	"ndb_use_transactions":                              VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"delayed_queue_size":                                VarInfo{SCOPE_GLOBAL, "1000"},
+	"innodb_log_buffer_size":                            VarInfo{SCOPE_NONE, "8388608"},
+	"innodb_log_compressed_pages":                       VarInfo{SCOPE_GLOBAL, "ON"},
+	"innodb_purge_batch_size":                           VarInfo{SCOPE_GLOBAL, "300"},
+	"metadata_locks_cache_size":                         VarInfo{SCOPE_NONE, "1024"},
+	"rpl_semi_sync_master_wait_for_slave_count":         VarInfo{SCOPE_GLOBAL, ""},
+	"gtid_purged":                                       VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_ft_num_word_optimize":                       VarInfo{SCOPE_GLOBAL, "2000"},
+	"innodb_locks_unsafe_for_binlog":                    VarInfo{SCOPE_NONE, "OFF"},
+	"innodb_open_files":                                 VarInfo{SCOPE_NONE, "2000"},
+	"innodb_thread_sleep_delay":                         VarInfo{SCOPE_GLOBAL, "10000"},
+	"log_bin":                                           VarInfo{SCOPE_NONE, "OFF"},
+	"innodb_autoextend_increment":                       VarInfo{SCOPE_GLOBAL, "64"},
+	"innodb_read_only":                                  VarInfo{SCOPE_NONE, "OFF"},
+	"transaction_prealloc_size":                         VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "4096"},
+	"version":                                           VarInfo{SCOPE_NONE, "5.6.25"},
+	"datetime_format":                                   VarInfo{SCOPE_NONE, "%Y-%m-%d %H:%i:%s"},
+	"ft_max_word_len":                                   VarInfo{SCOPE_NONE, "84"},
+	"innodb_additional_mem_pool_size":                   VarInfo{SCOPE_NONE, "8388608"},
+	"gtid_executed_compression_period":                  VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_flush_sync":                                 VarInfo{SCOPE_GLOBAL, ""},
+	"innodb_ft_max_token_size":                          VarInfo{SCOPE_NONE, "84"},
+	"innodb_stats_auto_recalc":                          VarInfo{SCOPE_GLOBAL, "ON"},
+	"master_info_repository":                            VarInfo{SCOPE_GLOBAL, "FILE"},
+	"binlog_order_commits":                              VarInfo{SCOPE_GLOBAL, "ON"},
+	"binlogging_impossible_mode":                        VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "IGNORE_ERROR"},
+	"binlog_group_commit_sync_no_delay_count":           VarInfo{SCOPE_GLOBAL, ""},
+	"ndb_eventbuffer_free_percent":                      VarInfo{SCOPE_GLOBAL, ""},
+	"slave_parallel_type":                               VarInfo{SCOPE_GLOBAL, ""},
+	"max_digest_length":                                 VarInfo{SCOPE_NONE, "1024"},
+	"read_buffer_size":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "131072"},
+	"session_track_gtids":                               VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, ""},
+	"query_cache_size":                                  VarInfo{SCOPE_GLOBAL, "1048576"},
+	"back_log":                                          VarInfo{SCOPE_NONE, "80"},
+	"innodb_online_alter_log_max_size":                  VarInfo{SCOPE_GLOBAL, "134217728"},
+	"innodb_ft_aux_table":                               VarInfo{SCOPE_GLOBAL, ""},
+	"completion_type":                                   VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "NO_CHAIN"},
+	"innodb_print_all_deadlocks":                        VarInfo{SCOPE_GLOBAL, "OFF"},
+	"ndb_log_updated_only":                              VarInfo{SCOPE_GLOBAL, ""},
+	"have_crypt":                                        VarInfo{SCOPE_NONE, "YES"},
+	"innodb_ft_enable_diag_print":                       VarInfo{SCOPE_GLOBAL, "OFF"},
+	"innodb_table_locks":                                VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "ON"},
+	"log_queries_not_using_indexes":                     VarInfo{SCOPE_GLOBAL, "OFF"},
+	"max_heap_table_size":                               VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "16777216"},
+	"innodb_old_blocks_pct":                             VarInfo{SCOPE_GLOBAL, "37"},
+	"optimizer_prune_level":                             VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "1"},
+	"gtid_next":                                         VarInfo{SCOPE_SESSION, ""},
+	"sql_auto_is_null":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"delayed_insert_timeout":                            VarInfo{SCOPE_GLOBAL, "300"},
+	"innodb_file_format_check":                          VarInfo{SCOPE_NONE, "ON"},
+	"master_verify_checksum":                            VarInfo{SCOPE_GLOBAL, "OFF"},
+	"timestamp":                                         VarInfo{SCOPE_SESSION, ""},
+	"character_sets_dir":                                VarInfo{SCOPE_NONE, "/usr/local/mysql-5.6.25-osx10.8-x86_64/share/charsets/"},
+	"innodb_stats_transient_sample_pages":               VarInfo{SCOPE_GLOBAL, "8"},
+	"relay_log_info_repository":                         VarInfo{SCOPE_GLOBAL, "FILE"},
+	"sort_buffer_size":                                  VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "262144"},
+	"ndb_eventbuffer_max_alloc":                         VarInfo{SCOPE_GLOBAL, ""},
+	"optimizer_trace_offset":                            VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "-1"},
+	"tx_isolation":                                      VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "REPEATABLE-READ"},
+	"binlog_rows_query_log_events":                      VarInfo{SCOPE_GLOBAL | SCOPE_SESSION, "OFF"},
+	"innodb_buffer_pool_dump_at_shutdown":               VarInfo{SCOPE_GLOBAL, "OFF"},
 }
-
-var variableScopeStr = `
-auto_increment_increment GS
-auto_increment_offset GS
-autocommit GS
-automatic_sp_privileges G
-avoid_temporal_upgrade G
-big_tables GS
-binlog_cache_size G
-binlog_checksum G
-binlog_direct_non_transactional_updates GS
-binlog_error_action GS
-binlog_format GS
-binlog_group_commit_sync_delay G
-binlog_group_commit_sync_no_delay_count G
-binlog_max_flush_queue_time G
-binlog_order_commits G
-binlog_row_image GS
-binlog_rows_query_log_events GS
-binlog_stmt_cache_size G
-binlogging_impossible_mode GS
-block_encryption_mode GS
-bulk_insert_buffer_size GS
-character_set_client GS
-character_set_connection GS
-character_set_database GS
-character_set_filesystem GS
-character_set_results GS
-character_set_server GS
-check_proxy_users G
-collation_connection GS
-collation_database GS
-collation_server GS
-completion_type GS
-concurrent_insert G
-connect_timeout G
-debug GS
-debug_sync S
-default_password_lifetime G
-default_storage_engine GS
-default_tmp_storage_engine GS
-default_week_format GS
-delay_key_write G
-delayed_insert_limit G
-delayed_insert_timeout G
-delayed_queue_size G
-div_precision_increment GS
-end_markers_in_json GS
-enforce_gtid_consistency G
-enforce_gtid_consistency G
-eq_range_index_dive_limit GS
-event_scheduler G
-executed_gtids_compression_period G
-expire_logs_days G
-flush G
-flush_time G
-foreign_key_checks GS
-ft_boolean_syntax G
-general_log G
-general_log_file G
-group_concat_max_len GS
-gtid_executed_compression_period G
-gtid_mode G
-gtid_mode G
-gtid_next S
-gtid_purged G
-host_cache_size G
-identity S
-init_connect G
-init_slave G
-innodb_adaptive_flushing G
-innodb_adaptive_flushing_lwm G
-innodb_adaptive_hash_index G
-innodb_adaptive_max_sleep_delay G
-innodb_api_bk_commit_interval G
-innodb_api_trx_level G
-innodb_autoextend_increment G
-innodb_buffer_pool_dump_at_shutdown G
-innodb_buffer_pool_dump_now G
-innodb_buffer_pool_dump_pct G
-innodb_buffer_pool_filename G
-innodb_buffer_pool_load_abort G
-innodb_buffer_pool_load_now G
-innodb_buffer_pool_size G
-innodb_change_buffer_max_size G
-innodb_change_buffering G
-innodb_checksum_algorithm G
-innodb_cmp_per_index_enabled G
-innodb_commit_concurrency G
-innodb_compression_failure_threshold_pct G
-innodb_compression_level G
-innodb_compression_pad_pct_max G
-innodb_concurrency_tickets G
-innodb_create_intrinsic S
-innodb_disable_sort_file_cache G
-innodb_fast_shutdown G
-innodb_file_format G
-innodb_file_format_max G
-innodb_file_per_table G
-innodb_fill_factor G
-innodb_flush_log_at_timeout G
-innodb_flush_log_at_trx_commit G
-innodb_flush_neighbors G
-innodb_flush_sync G
-innodb_flushing_avg_loops G
-innodb_ft_aux_table G
-innodb_ft_enable_diag_print G
-innodb_ft_enable_stopword G
-innodb_ft_num_word_optimize G
-innodb_ft_result_cache_limit G
-innodb_ft_server_stopword_table G
-innodb_ft_user_stopword_table GS
-innodb_io_capacity G
-innodb_io_capacity_max G
-innodb_large_prefix G
-innodb_lock_wait_timeout GS
-innodb_log_checksum_algorithm G
-innodb_log_compressed_pages G
-innodb_log_write_ahead_size G
-innodb_lru_scan_depth G
-innodb_max_dirty_pages_pct G
-innodb_max_dirty_pages_pct_lwm G
-innodb_max_purge_lag G
-innodb_max_purge_lag_delay G
-innodb_max_undo_log_size G
-innodb_monitor_disable G
-innodb_monitor_enable G
-innodb_monitor_reset G
-innodb_monitor_reset_all G
-innodb_old_blocks_pct G
-innodb_old_blocks_time G
-innodb_online_alter_log_max_size G
-innodb_optimize_fulltext_only G
-innodb_optimize_point_storage S
-innodb_print_all_deadlocks G
-innodb_purge_batch_size G
-innodb_purge_rseg_truncate_frequency G
-innodb_random_read_ahead G
-innodb_read_ahead_threshold G
-innodb_replication_delay G
-innodb_rollback_segments G
-innodb_spin_wait_delay G
-innodb_stats_auto_recalc G
-innodb_stats_method G
-innodb_stats_on_metadata G
-innodb_stats_persistent G
-innodb_stats_persistent_sample_pages G
-innodb_stats_sample_pages G
-innodb_stats_transient_sample_pages G
-innodb_status_output G
-innodb_status_output_locks G
-innodb_strict_mode GS
-innodb_support_xa GS
-innodb_sync_spin_loops G
-innodb_table_locks GS
-innodb_thread_concurrency G
-innodb_thread_sleep_delay G
-innodb_undo_log_truncate G
-innodb_undo_logs G
-insert_id S
-interactive_timeout GS
-internal_tmp_disk_storage_engine G
-join_buffer_size GS
-keep_files_on_create GS
-key_buffer_size G
-key_cache_age_threshold G
-key_cache_block_size G
-key_cache_division_limit G
-last_insert_id S
-lc_messages GS
-lc_time_names GS
-local_infile G
-lock_wait_timeout GS
-log_backward_compatible_user_definitions G
-log_bin_trust_function_creators G
-log_error_verbosity G
-log_output set G
-log_queries_not_using_indexes G
-log_slow_admin_statements G
-log_slow_slave_statements G
-log_syslog G
-log_syslog_facility G
-log_syslog_include_pid G
-log_syslog_tag G
-log_throttle_queries_not_using_indexes G
-log_timestamps G
-log_warnings G
-long_query_time GS
-low_priority_updates GS
-master_info_repository G
-master_verify_checksum G
-max_allowed_packet G
-max_binlog_cache_size G
-max_binlog_size G
-max_binlog_stmt_cache_size G
-max_connect_errors G
-max_connections G
-max_delayed_threads GS
-max_error_count GS
-max_heap_table_size GS
-max_insert_delayed_threads GS
-max_join_size GS
-max_length_for_sort_data GS
-max_points_in_geometry G
-max_prepared_stmt_count G
-max_relay_log_size G
-max_seeks_for_key GS
-max_sort_length GS
-max_sp_recursion_depth GS
-max_statement_time GS
-max_user_connections GS
-max_write_lock_count G
-min_examined_row_limit GS
-myisam_data_pointer_size G
-myisam_max_sort_file_size G
-myisam_repair_threads GS
-myisam_sort_buffer_size GS
-myisam_stats_method GS
-myisam_use_mmap G
-mysql_native_password_proxy_users G
-ndb_blob_write_batch_bytes GS
-ndb_deferred_constraints GS
-ndb_deferred_constraints GS
-ndb_distribution G
-ndb_distribution G
-ndb_eventbuffer_free_percent G
-ndb_eventbuffer_max_alloc G
-ndb_force_send GS
-ndb_index_stat_enable GS
-ndb_index_stat_option GS
-ndb_join_pushdown GS
-ndb_log_binlog_index G
-ndb_log_empty_epochs G
-ndb_log_updated_only G
-ndb_optimization_delay G
-ndb_recv_thread_cpu_mask bitmap G
-ndb_show_foreign_key_mock_tables G
-ndb_table_no_logging S
-ndb_use_transactions GS
-ndbinfo_max_rows GS
-ndbinfo_show_hidden GS
-net_buffer_length GS
-net_read_timeout GS
-net_retry_count GS
-net_write_timeout GS
-new GS
-offline_mode G
-old_alter_table GS
-old_passwords GS
-optimizer_prune_level GS
-optimizer_search_depth GS
-optimizer_switch set GS
-optimizer_trace GS
-optimizer_trace_features GS
-optimizer_trace_limit GS
-optimizer_trace_max_mem_size GS
-optimizer_trace_offset GS
-preload_buffer_size GS
-profiling GS
-profiling_history_size GS
-pseudo_slave_mode S
-pseudo_thread_id S
-query_alloc_block_size GS
-query_cache_limit G
-query_cache_min_res_unit G
-query_cache_size G
-query_cache_type GS
-query_cache_wlock_invalidate GS
-query_prealloc_size GS
-rand_seed1 S
-rand_seed2 S
-range_alloc_block_size GS
-rbr_exec_mode S
-read_buffer_size GS
-read_only G
-read_rnd_buffer_size GS
-relay_log_info_repository G
-relay_log_purge G
-rewriter_enabled G
-rewriter_verbose G
-rpl_semi_sync_master_enabled G
-rpl_semi_sync_master_timeout G
-rpl_semi_sync_master_trace_level G
-rpl_semi_sync_master_wait_for_slave_count G
-rpl_semi_sync_master_wait_no_slave G
-rpl_semi_sync_master_wait_point G
-rpl_semi_sync_slave_enabled G
-rpl_semi_sync_slave_trace_level G
-rpl_stop_slave_timeout G
-secure_auth G
-server_id G
-session_track_gtids GS
-session_track_schema GS
-session_track_state_change GS
-session_track_system_variables GS
-sha256_password_proxy_users G
-show_compatibility_56 G
-show_old_temporals GS
-slave_allow_batching G
-slave_checkpoint_group G
-slave_checkpoint_period G
-slave_compressed_protocol G
-slave_exec_mode G
-slave_max_allowed_packet G
-slave_net_timeout G
-slave_parallel_type G
-slave_parallel_workers G
-slave_pending_jobs_size_max G
-slave_preserve_commit_order G
-slave_rows_search_algorithms G
-slave_sql_verify_checksum G
-slave_transaction_retries G
-slow_launch_time G
-slow_query_log G
-slow_query_log_file G
-sort_buffer_size GS
-sql_auto_is_null GS
-sql_big_selects GS
-sql_buffer_result GS
-sql_log_bin GS
-sql_log_off GS
-sql_mode set GS
-sql_notes GS
-sql_quote_show_create GS
-sql_safe_updates GS
-sql_select_limit GS
-sql_slave_skip_counter G
-sql_warnings GS
-storage_engine GS
-stored_program_cache G
-super_read_only G
-sync_binlog G
-sync_frm G
-sync_master_info G
-sync_relay_log G
-sync_relay_log_info G
-table_definition_cache G
-table_open_cache G
-thread_cache_size G
-time_zone GS
-timed_mutexes G
-timestamp S
-tmp_table_size GS
-transaction_alloc_block_size GS
-transaction_allow_batching S
-transaction_prealloc_size GS
-transaction_write_set_extraction GS
-tx_isolation GS
-tx_read_only GS
-unique_checks GS
-updatable_views_with_limit GS
-validate_password_dictionary_file G
-validate_password_length G
-validate_password_mixed_case_count G
-validate_password_number_count G
-validate_password_policy G
-validate_password_special_char_count G
-wait_timeout GS`
-
-var defaultVarStr = `
-auto_increment_increment 1
-auto_increment_offset 1
-autocommit ON
-automatic_sp_privileges ON
-avoid_temporal_upgrade OFF
-back_log 80
-basedir /usr/local/mysql
-big_tables OFF
-bind_address *
-binlog_cache_size 32768
-binlog_checksum CRC32
-binlog_direct_non_transactional_updates OFF
-binlog_error_action IGNORE_ERROR
-binlog_format STATEMENT
-binlog_gtid_simple_recovery OFF
-binlog_max_flush_queue_time 0
-binlog_order_commits ON
-binlog_row_image FULL
-binlog_rows_query_log_events OFF
-binlog_stmt_cache_size 32768
-binlogging_impossible_mode IGNORE_ERROR
-block_encryption_mode aes-128-ecb
-bulk_insert_buffer_size 8388608
-character_set_client latin1
-character_set_connection latin1
-character_set_database latin1
-character_set_filesystem binary
-character_set_results latin1
-character_set_server latin1
-character_set_system utf8
-character_sets_dir /usr/local/mysql-5.6.25-osx10.8-x86_64/share/charsets/
-collation_connection latin1_swedish_ci
-collation_database latin1_swedish_ci
-collation_server latin1_swedish_ci
-completion_type NO_CHAIN
-concurrent_insert AUTO
-connect_timeout 10
-core_file OFF
-datadir /usr/local/mysql/data/
-date_format %Y-%m-%d
-datetime_format %Y-%m-%d %H:%i:%s
-default_storage_engine InnoDB
-default_tmp_storage_engine InnoDB
-default_week_format 0
-delay_key_write ON
-delayed_insert_limit 100
-delayed_insert_timeout 300
-delayed_queue_size 1000
-disconnect_on_expired_password ON
-div_precision_increment 4
-end_markers_in_json OFF
-enforce_gtid_consistency OFF
-eq_range_index_dive_limit 10
-event_scheduler OFF
-expire_logs_days 0
-explicit_defaults_for_timestamp OFF
-flush OFF
-flush_time 0
-foreign_key_checks ON
-ft_boolean_syntax + -><()~*:""&|
-ft_max_word_len 84
-ft_min_word_len 4
-ft_query_expansion_limit 20
-ft_stopword_file (built-in)
-general_log OFF
-general_log_file /usr/local/mysql/data/localhost.log
-group_concat_max_len 1024
-gtid_executed
-gtid_mode OFF
-gtid_owned
-gtid_purged
-have_compress YES
-have_crypt YES
-have_dynamic_loading YES
-have_geometry YES
-have_openssl DISABLED
-have_profiling YES
-have_query_cache YES
-have_rtree_keys YES
-have_ssl DISABLED
-have_symlink YES
-host_cache_size 279
-hostname localhost
-ignore_builtin_innodb OFF
-ignore_db_dirs
-init_connect
-init_file
-init_slave
-innodb_adaptive_flushing ON
-innodb_adaptive_flushing_lwm 10
-innodb_adaptive_hash_index ON
-innodb_adaptive_max_sleep_delay 150000
-innodb_additional_mem_pool_size 8388608
-innodb_api_bk_commit_interval 5
-innodb_api_disable_rowlock OFF
-innodb_api_enable_binlog OFF
-innodb_api_enable_mdl OFF
-innodb_api_trx_level 0
-innodb_autoextend_increment 64
-innodb_autoinc_lock_mode 1
-innodb_buffer_pool_dump_at_shutdown OFF
-innodb_buffer_pool_dump_now OFF
-innodb_buffer_pool_filename ib_buffer_pool
-innodb_buffer_pool_instances 8
-innodb_buffer_pool_load_abort OFF
-innodb_buffer_pool_load_at_startup OFF
-innodb_buffer_pool_load_now OFF
-innodb_buffer_pool_size 134217728
-innodb_change_buffer_max_size 25
-innodb_change_buffering all
-innodb_checksum_algorithm innodb
-innodb_checksums ON
-innodb_cmp_per_index_enabled OFF
-innodb_commit_concurrency 0
-innodb_compression_failure_threshold_pct 5
-innodb_compression_level 6
-innodb_compression_pad_pct_max 50
-innodb_concurrency_tickets 5000
-innodb_data_file_path ibdata1:12M:autoextend
-innodb_data_home_dir
-innodb_disable_sort_file_cache OFF
-innodb_doublewrite ON
-innodb_fast_shutdown 1
-innodb_file_format Antelope
-innodb_file_format_check ON
-innodb_file_format_max Antelope
-innodb_file_per_table ON
-innodb_flush_log_at_timeout 1
-innodb_flush_log_at_trx_commit 1
-innodb_flush_method
-innodb_flush_neighbors 1
-innodb_flushing_avg_loops 30
-innodb_force_load_corrupted OFF
-innodb_force_recovery 0
-innodb_ft_aux_table
-innodb_ft_cache_size 8000000
-innodb_ft_enable_diag_print OFF
-innodb_ft_enable_stopword ON
-innodb_ft_max_token_size 84
-innodb_ft_min_token_size 3
-innodb_ft_num_word_optimize 2000
-innodb_ft_result_cache_limit 2000000000
-innodb_ft_server_stopword_table
-innodb_ft_sort_pll_degree 2
-innodb_ft_total_cache_size 640000000
-innodb_ft_user_stopword_table
-innodb_io_capacity 200
-innodb_io_capacity_max 2000
-innodb_large_prefix OFF
-innodb_lock_wait_timeout 50
-innodb_locks_unsafe_for_binlog OFF
-innodb_log_buffer_size 8388608
-innodb_log_compressed_pages ON
-innodb_log_file_size 50331648
-innodb_log_files_in_group 2
-innodb_log_group_home_dir ./
-innodb_lru_scan_depth 1024
-innodb_max_dirty_pages_pct 75
-innodb_max_dirty_pages_pct_lwm 0
-innodb_max_purge_lag 0
-innodb_max_purge_lag_delay 0
-innodb_mirrored_log_groups 1
-innodb_monitor_disable
-innodb_monitor_enable
-innodb_monitor_reset
-innodb_monitor_reset_all
-innodb_old_blocks_pct 37
-innodb_old_blocks_time 1000
-innodb_online_alter_log_max_size 134217728
-innodb_open_files 2000
-innodb_optimize_fulltext_only OFF
-innodb_page_size 16384
-innodb_print_all_deadlocks OFF
-innodb_purge_batch_size 300
-innodb_purge_threads 1
-innodb_random_read_ahead OFF
-innodb_read_ahead_threshold 56
-innodb_read_io_threads 4
-innodb_read_only OFF
-innodb_replication_delay 0
-innodb_rollback_on_timeout OFF
-innodb_rollback_segments 128
-innodb_sort_buffer_size 1048576
-innodb_spin_wait_delay 6
-innodb_stats_auto_recalc ON
-innodb_stats_method nulls_equal
-innodb_stats_on_metadata OFF
-innodb_stats_persistent ON
-innodb_stats_persistent_sample_pages 20
-innodb_stats_sample_pages 8
-innodb_stats_transient_sample_pages 8
-innodb_status_output OFF
-innodb_status_output_locks OFF
-innodb_strict_mode OFF
-innodb_support_xa ON
-innodb_sync_array_size 1
-innodb_sync_spin_loops 30
-innodb_table_locks ON
-innodb_thread_concurrency 0
-innodb_thread_sleep_delay 10000
-innodb_undo_directory .
-innodb_undo_logs 128
-innodb_undo_tablespaces 0
-innodb_use_native_aio OFF
-innodb_use_sys_malloc ON
-innodb_version 5.6.25
-innodb_write_io_threads 4
-interactive_timeout 28800
-join_buffer_size 262144
-keep_files_on_create OFF
-key_buffer_size 8388608
-key_cache_age_threshold 300
-key_cache_block_size 1024
-key_cache_division_limit 100
-large_files_support ON
-large_page_size 0
-large_pages OFF
-lc_messages en_US
-lc_messages_dir /usr/local/mysql-5.6.25-osx10.8-x86_64/share/
-lc_time_names en_US
-license GPL
-local_infile ON
-lock_wait_timeout 31536000
-locked_in_memory OFF
-log_bin OFF
-log_bin_basename
-log_bin_index
-log_bin_trust_function_creators OFF
-log_bin_use_v1_row_events OFF
-log_error /usr/local/mysql/data/localhost.err
-log_output FILE
-log_queries_not_using_indexes OFF
-log_slave_updates OFF
-log_slow_admin_statements OFF
-log_slow_slave_statements OFF
-log_throttle_queries_not_using_indexes 0
-log_warnings 1
-long_query_time 10.000000
-low_priority_updates OFF
-lower_case_file_system ON
-lower_case_table_names 2
-master_info_repository FILE
-master_verify_checksum OFF
-max_allowed_packet 4194304
-max_binlog_cache_size 18446744073709547520
-max_binlog_size 1073741824
-max_binlog_stmt_cache_size 18446744073709547520
-max_connect_errors 100
-max_connections 151
-max_delayed_threads 20
-max_digest_length 1024
-max_error_count 64
-max_heap_table_size 16777216
-max_insert_delayed_threads 20
-max_join_size 18446744073709551615
-max_length_for_sort_data 1024
-max_prepared_stmt_count 16382
-max_relay_log_size 0
-max_seeks_for_key 18446744073709551615
-max_sort_length 1024
-max_sp_recursion_depth 0
-max_tmp_tables 32
-max_user_connections 0
-max_write_lock_count 18446744073709551615
-metadata_locks_cache_size 1024
-metadata_locks_hash_instances 8
-min_examined_row_limit 0
-multi_range_count 256
-myisam_data_pointer_size 6
-myisam_max_sort_file_size 9223372036853727232
-myisam_mmap_size 18446744073709551615
-myisam_recover_options OFF
-myisam_repair_threads 1
-myisam_sort_buffer_size 8388608
-myisam_stats_method nulls_unequal
-myisam_use_mmap OFF
-net_buffer_length 16384
-net_read_timeout 30
-net_retry_count 10
-net_write_timeout 60
-new OFF
-old OFF
-old_alter_table OFF
-old_passwords 0
-open_files_limit 5000
-optimizer_prune_level 1
-optimizer_search_depth 62
-optimizer_switch index_merge=on,index_merge_union=on,index_merge_sort_union=on,index_merge_intersection=on,engine_condition_pushdown=on,index_condition_pushdown=on,mrr=on,mrr_cost_based=on,block_nested_loop=on,batched_key_access=off,materialization=on,semijoin=on,loosescan=on,firstmatch=on,subquery_materialization_cost_based=on,use_index_extensions=on
-optimizer_trace enabled=off,one_line=off
-optimizer_trace_features greedy_search=on,range_optimizer=on,dynamic_range=on,repeated_subselect=on
-optimizer_trace_limit 1
-optimizer_trace_max_mem_size 16384
-optimizer_trace_offset -1
-performance_schema ON
-performance_schema_accounts_size 100
-performance_schema_digests_size 10000
-performance_schema_events_stages_history_long_size 10000
-performance_schema_events_stages_history_size 10
-performance_schema_events_statements_history_long_size 10000
-performance_schema_events_statements_history_size 10
-performance_schema_events_waits_history_long_size 10000
-performance_schema_events_waits_history_size 10
-performance_schema_hosts_size 100
-performance_schema_max_cond_classes 80
-performance_schema_max_cond_instances 3504
-performance_schema_max_file_classes 50
-performance_schema_max_file_handles 32768
-performance_schema_max_file_instances 7693
-performance_schema_max_mutex_classes 200
-performance_schema_max_mutex_instances 15906
-performance_schema_max_rwlock_classes 40
-performance_schema_max_rwlock_instances 9102
-performance_schema_max_socket_classes 10
-performance_schema_max_socket_instances 322
-performance_schema_max_stage_classes 150
-performance_schema_max_statement_classes 168
-performance_schema_max_table_handles 4000
-performance_schema_max_table_instances 12500
-performance_schema_max_thread_classes 50
-performance_schema_max_thread_instances 402
-performance_schema_session_connect_attrs_size 512
-performance_schema_setup_actors_size 100
-performance_schema_setup_objects_size 100
-performance_schema_users_size 100
-pid_file /usr/local/mysql/data/localhost.pid
-plugin_dir /usr/local/mysql/lib/plugin/
-port 3306
-preload_buffer_size 32768
-profiling OFF
-profiling_history_size 15
-protocol_version 10
-query_alloc_block_size 8192
-query_cache_limit 1048576
-query_cache_min_res_unit 4096
-query_cache_size 1048576
-query_cache_type OFF
-query_cache_wlock_invalidate OFF
-query_prealloc_size 8192
-range_alloc_block_size 4096
-read_buffer_size 131072
-read_only OFF
-read_rnd_buffer_size 262144
-relay_log
-relay_log_basename
-relay_log_index
-relay_log_info_file relay-log.info
-relay_log_info_repository FILE
-relay_log_purge ON
-relay_log_recovery OFF
-relay_log_space_limit 0
-report_host
-report_password
-report_port 3306
-report_user
-rpl_stop_slave_timeout 31536000
-secure_auth ON
-secure_file_priv
-server_id 0
-server_id_bits 32
-server_uuid d530594e-1c86-11e5-878b-6b36ce6799ca
-show_old_temporals OFF
-simplified_binlog_gtid_recovery OFF
-skip_external_locking ON
-skip_name_resolve OFF
-skip_networking OFF
-skip_show_database OFF
-slave_allow_batching OFF
-slave_checkpoint_group 512
-slave_checkpoint_period 300
-slave_compressed_protocol OFF
-slave_exec_mode STRICT
-slave_load_tmpdir /var/tmp/
-slave_max_allowed_packet 1073741824
-slave_net_timeout 3600
-slave_parallel_workers 0
-slave_pending_jobs_size_max 16777216
-slave_rows_search_algorithms TABLE_SCAN,INDEX_SCAN
-slave_skip_errors OFF
-slave_sql_verify_checksum ON
-slave_transaction_retries 10
-slave_type_conversions
-slow_launch_time 2
-slow_query_log OFF
-slow_query_log_file /usr/local/mysql/data/localhost-slow.log
-socket /tmp/mysql.sock
-sort_buffer_size 262144
-sql_auto_is_null OFF
-sql_big_selects ON
-sql_buffer_result OFF
-sql_log_bin ON
-sql_log_off OFF
-sql_mode STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION
-sql_notes ON
-sql_quote_show_create ON
-sql_safe_updates OFF
-sql_select_limit 18446744073709551615
-sql_slave_skip_counter 0
-sql_warnings OFF
-ssl_ca
-ssl_capath
-ssl_cert
-ssl_cipher
-ssl_crl
-ssl_crlpath
-ssl_key
-storage_engine InnoDB
-stored_program_cache 256
-sync_binlog 0
-sync_frm ON
-sync_master_info 10000
-sync_relay_log 10000
-sync_relay_log_info 10000
-system_time_zone CST
-table_definition_cache 1400
-table_open_cache 2000
-table_open_cache_instances 1
-thread_cache_size 9
-thread_concurrency 10
-thread_handling one-thread-per-connection
-thread_stack 262144
-time_format %H:%i:%s
-time_zone SYSTEM
-timed_mutexes OFF
-tmp_table_size 16777216
-tmpdir /var/tmp/
-transaction_alloc_block_size 8192
-transaction_prealloc_size 4096
-tx_isolation REPEATABLE-READ
-tx_read_only OFF
-unique_checks ON
-updatable_views_with_limit YES
-version 5.6.25
-version_comment MySQL Community Server (GPL)
-version_compile_machine x86_64
-version_compile_os osx10.8
-wait_timeout 28800`
