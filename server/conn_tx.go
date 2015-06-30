@@ -40,14 +40,12 @@ func (c *Conn) handleRollback() (err error) {
 
 func (c *Conn) commit() (err error) {
 	c.status &= ^mysql.SERVER_STATUS_IN_TRANS
-	c.status |= mysql.SERVER_STATUS_AUTOCOMMIT
 
 	return
 }
 
 func (c *Conn) rollback() (err error) {
 	c.status &= ^mysql.SERVER_STATUS_IN_TRANS
-	c.status |= mysql.SERVER_STATUS_AUTOCOMMIT
 
 	return
 }

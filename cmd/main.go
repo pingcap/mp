@@ -9,8 +9,7 @@ import (
 	"runtime"
 	"syscall"
 
-	log "github.com/ngaut/logging"
-	"github.com/pingcap/mp/config"
+	"github.com/ngaut/log"
 	"github.com/pingcap/mp/server"
 )
 
@@ -26,7 +25,7 @@ func main() {
 		return
 	}
 
-	cfg, err := config.ParseConfigFile(*configFile)
+	cfg, err := server.ParseConfigFile(*configFile)
 	if err != nil {
 		log.Error(err.Error())
 		return
@@ -37,7 +36,7 @@ func main() {
 	log.CrashLog("./cm-proxy.dump")
 
 	var svr *server.Server
-	svr, err = server.NewServer(*configFile)
+	svr, err = server.NewServer(cfg)
 	if err != nil {
 		log.Error(err.Error())
 		return

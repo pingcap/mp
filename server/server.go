@@ -10,7 +10,6 @@ import (
 	stats "github.com/ngaut/gostats"
 	log "github.com/ngaut/logging"
 	"github.com/ngaut/tokenlimiter"
-	"github.com/pingcap/mp/config"
 	"github.com/pingcap/mp/protocol"
 	//	"github.com/pingcap/ql"
 )
@@ -20,11 +19,7 @@ var (
 )
 
 type Server struct {
-	configFile        string
-	cfg               *config.Config
-	addr              string
-	user              string
-	password          string
+	cfg               *Config
 	listener          net.Listener
 	rwlock            *sync.RWMutex
 	concurrentLimiter *tokenlimiter.TokenLimiter
@@ -84,24 +79,15 @@ func (s *Server) SkipAuth() bool {
 }
 
 func (s *Server) CfgGetPwd(user string) string {
-	return s.cfg.Password
+	return s.cfg.Password //TODO support multiple users
 }
 
-func makeServer(configFile string) *Server {
-	cfg, err := config.ParseConfigFile(configFile)
-	if err != nil {
-		log.Error(err.Error())
-		return nil
-	}
+func makeServer(cfg *Config) *Server {
 
 	log.Warningf("%#v", cfg)
 
 	s := &Server{
-		configFile:        configFile,
 		cfg:               cfg,
-		addr:              cfg.Addr,
-		user:              cfg.User,
-		password:          cfg.Password,
 		concurrentLimiter: tokenlimiter.NewTokenLimiter(100),
 		counter:           stats.NewCounters("stats"),
 		rwlock:            &sync.RWMutex{},
@@ -111,15 +97,15 @@ func makeServer(configFile string) *Server {
 	return s
 }
 
-func NewServer(configFile string) (*Server, error) {
-	s := makeServer(configFile)
+func NewServer(config *Config) (*Server, error) {
+	s := makeServer(config)
 	var err error
-	s.listener, err = net.Listen("tcp", s.addr)
+	s.listener, err = net.Listen("tcp", s.cfg.Addr)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
 
-	log.Infof("Server run MySql Protocol Listen at [%s]", s.addr)
+	log.Infof("Server run MySql Protocol Listen at [%s]", s.cfg.Addr)
 	return s, nil
 }
 
