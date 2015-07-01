@@ -13,7 +13,6 @@ import (
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	"github.com/pingcap/mp/protocol"
-	"github.com/pingcap/ql"
 )
 
 var DEFAULT_CAPABILITY uint32 = protocol.CLIENT_LONG_PASSWORD | protocol.CLIENT_LONG_FLAG |
@@ -24,23 +23,21 @@ var DEFAULT_CAPABILITY uint32 = protocol.CLIENT_LONG_PASSWORD | protocol.CLIENT_
 type Conn struct {
 	pkg          *protocol.PacketIO
 	c            net.Conn
-	server       IServer
+	server       *Server
 	capability   uint32
 	connectionId uint32
-	status       uint16
 	collation    protocol.CollationId
 	charset      string
 	user         string
 	salt         []byte
 	alloc        arena.ArenaAllocator
 	lastCmd      string
-	db           *ql.DB
-	ctx          *ql.TCtx
+	ctx          SessionCtx
 }
 
 func (c *Conn) String() string {
-	return fmt.Sprintf("conn: %s, status: %d, charset: %s, user: %s, db: %s, lastInsertId: %d",
-		c.c.RemoteAddr(), c.status, c.charset, c.user, c.db.Name(), c.ctx.LastInsertID,
+	return fmt.Sprintf("conn: %s, status: %d, charset: %s, user: %s, lastInsertId: %d",
+		c.c.RemoteAddr(), c.ctx.Status(), c.charset, c.user, c.ctx.LastInsertId(),
 	)
 }
 
@@ -61,9 +58,7 @@ func (c *Conn) Handshake() error {
 }
 
 func (c *Conn) Close() error {
-	c.rollback()
 	c.c.Close()
-
 	return nil
 }
 
@@ -86,7 +81,7 @@ func (c *Conn) writeInitialHandshake() error {
 	//charset, utf-8 default
 	data = append(data, uint8(protocol.DEFAULT_COLLATION_ID))
 	//status
-	data = append(data, byte(c.status), byte(c.status>>8))
+	data = append(data, byte(c.ctx.Status()), byte(c.ctx.Status()>>8))
 	//below 13 byte may not be used
 	//capability flag upper 2 bytes, using default capability here
 	data = append(data, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
@@ -197,7 +192,6 @@ func (c *Conn) Run() {
 func (c *Conn) dispatch(data []byte) error {
 	cmd := data[0]
 	data = data[1:]
-	log.Debug(c.db.Name())
 	log.Debug(c.connectionId, cmd, string(data))
 	c.lastCmd = hack.String(data)
 
@@ -247,8 +241,7 @@ func (c *Conn) dispatch(data []byte) error {
 }
 
 func (c *Conn) useDB(db string) (err error) {
-	c.db, err = ql.GetDB(db)
-	c.ctx = ql.NewRWCtx()
+	_, err = c.server.driver.Execute("use "+db, c.ctx)
 	return err
 }
 
@@ -266,10 +259,10 @@ func (c *Conn) writeOkFlush() error {
 func (c *Conn) writeOK() error {
 	data := c.alloc.AllocBytesWithLen(4, 32)
 	data = append(data, protocol.OK_HEADER)
-	data = append(data, protocol.PutLengthEncodedInt(uint64(c.ctx.RowsAffected))...)
-	data = append(data, protocol.PutLengthEncodedInt(uint64(c.ctx.LastInsertID))...)
+	data = append(data, protocol.PutLengthEncodedInt(uint64(c.ctx.AffectedRows()))...)
+	data = append(data, protocol.PutLengthEncodedInt(uint64(c.ctx.LastInsertId()))...)
 	if c.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
-		data = append(data, byte(c.status), byte(c.status>>8))
+		data = append(data, byte(c.ctx.Status()), byte(c.ctx.Status()>>8))
 		data = append(data, 0, 0)
 	}
 
@@ -319,23 +312,11 @@ func (c *Conn) writeEOF(status uint16) error {
 }
 
 func (c *Conn) handleQuery(sql string) (err error) {
-	list, err := ql.Compile(sql)
+	rs, err := c.server.driver.Execute(sql, c.ctx)
 	if err != nil {
 		return err
 	}
-	rs, err := c.db.Execute(c.ctx, list)
-	if err != nil {
-		return err
-	}
-	if list.IsSelectStmt() {
-		c.writeResultset(c.status, rs[0])
-	} else if list.IsBeginStmt() {
-		c.status |= protocol.SERVER_STATUS_IN_TRANS
-	} else if list.IsCommitStmt() {
-		c.status &= ^protocol.SERVER_STATUS_IN_TRANS
-	} else if list.IsRollbackStmt() {
-		c.status &= ^protocol.SERVER_STATUS_IN_TRANS
-	}
+	c.writeResultset(rs)
 	c.writeOK()
 	return
 }

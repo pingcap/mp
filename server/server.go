@@ -11,7 +11,6 @@ import (
 	"github.com/ngaut/log"
 	"github.com/ngaut/tokenlimiter"
 	"github.com/pingcap/mp/protocol"
-	//	"github.com/pingcap/ql"
 )
 
 var (
@@ -20,21 +19,12 @@ var (
 
 type Server struct {
 	cfg               *Config
+	driver            IDriver
 	listener          net.Listener
 	rwlock            *sync.RWMutex
 	concurrentLimiter *tokenlimiter.TokenLimiter
 	counter           *stats.Counters
 	clients           map[uint32]*Conn
-}
-
-type IServer interface {
-	CfgGetPwd(user string) string
-	SkipAuth() bool
-	GetToken() *tokenlimiter.Token
-	ReleaseToken(token *tokenlimiter.Token)
-	GetRWlock() *sync.RWMutex
-	IncCounter(key string)
-	DecCounter(key string)
 }
 
 func (s *Server) IncCounter(key string) {
@@ -63,6 +53,7 @@ func (s *Server) newConn(co net.Conn) *Conn {
 		collation:    protocol.DEFAULT_COLLATION_ID,
 		charset:      protocol.DEFAULT_CHARSET,
 		alloc:        arena.NewArenaAllocator(32 * 1024),
+		ctx:          s.driver.GetCtx(),
 	}
 	c.salt, _ = protocol.RandomBuf(20)
 
@@ -81,23 +72,17 @@ func (s *Server) CfgGetPwd(user string) string {
 	return s.cfg.Password //TODO support multiple users
 }
 
-func makeServer(cfg *Config) *Server {
-
+func NewServer(cfg *Config, driver IDriver) (*Server, error) {
 	log.Warningf("%#v", cfg)
-
 	s := &Server{
 		cfg:               cfg,
+		driver:            driver,
 		concurrentLimiter: tokenlimiter.NewTokenLimiter(100),
 		counter:           stats.NewCounters("stats"),
 		rwlock:            &sync.RWMutex{},
 		clients:           make(map[uint32]*Conn),
 	}
 
-	return s
-}
-
-func NewServer(config *Config) (*Server, error) {
-	s := makeServer(config)
 	var err error
 	s.listener, err = net.Listen("tcp", s.cfg.Addr)
 	if err != nil {
