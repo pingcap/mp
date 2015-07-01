@@ -1,4 +1,5 @@
 package server
+
 import (
 	"errors"
 	"github.com/pingcap/mp/protocol"
@@ -6,7 +7,7 @@ import (
 )
 
 type MockCtx struct {
-	status uint16
+	status       uint16
 	lastInsertId uint64
 	affectedRows uint64
 }
@@ -25,10 +26,10 @@ func (mCtx *MockCtx) AffectedRows() uint64 {
 
 type MockDriver struct {
 	columnMap map[string]*ColumnInfo
-	exeIdx int
-	inputs []string
-	outputs []*Result
-	ctxes []*MockCtx
+	exeIdx    int
+	inputs    []string
+	outputs   []*Result
+	ctxes     []*MockCtx
 }
 
 func NewMockDriver() *MockDriver {
@@ -39,14 +40,14 @@ func NewMockDriver() *MockDriver {
 
 func (mql *MockDriver) InitColumns(table, column string, typ uint8) {
 	mql.columnMap[table+"."+column] = &ColumnInfo{
-		Schema: "test",
-		Table: table,
-		OrgTable: table,
+		Schema:       "test",
+		Table:        table,
+		OrgTable:     table,
 		ColumnLength: 255,
-		Charset: uint16(protocol.DEFAULT_COLLATION_ID),
-		Flag: 0,
-		Decimal: 31,
-		Type: typ,
+		Charset:      uint16(protocol.DEFAULT_COLLATION_ID),
+		Flag:         0,
+		Decimal:      31,
+		Type:         typ,
 	}
 }
 

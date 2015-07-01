@@ -1,26 +1,27 @@
 package server
+
 import (
-	"github.com/pingcap/mp/protocol"
 	"github.com/ngaut/arena"
+	"github.com/pingcap/mp/protocol"
 	"github.com/pingcap/ql"
 )
 
 type ColumnInfo struct {
-	Schema       string
-	Table        string
-	OrgTable     string
-	Name         string
-	OrgName      string
-	ColumnLength uint32
-	Charset      uint16
-	Flag         uint16
-	Decimal      uint8
-	Type         uint8
+	Schema             string
+	Table              string
+	OrgTable           string
+	Name               string
+	OrgName            string
+	ColumnLength       uint32
+	Charset            uint16
+	Flag               uint16
+	Decimal            uint8
+	Type               uint8
 	DefaultValueLength uint64
 	DefaultValue       []byte
 }
 
-func (column *ColumnInfo) Dump (alloc arena.ArenaAllocator) []byte {
+func (column *ColumnInfo) Dump(alloc arena.ArenaAllocator) []byte {
 	l := len(column.Schema) + len(column.Table) + len(column.OrgTable) + len(column.Name) + len(column.OrgName) + len(column.DefaultValue) + 48
 
 	data := make([]byte, 0, l)
@@ -54,7 +55,7 @@ func (column *ColumnInfo) Dump (alloc arena.ArenaAllocator) []byte {
 
 type Result struct {
 	Columns []*ColumnInfo
-	Rows [][]interface{}
+	Rows    [][]interface{}
 }
 
 type SessionCtx interface {

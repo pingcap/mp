@@ -8,7 +8,6 @@ import (
 	"strconv"
 )
 
-
 func formatValue(value interface{}) ([]byte, error) {
 	switch v := value.(type) {
 	case int8:

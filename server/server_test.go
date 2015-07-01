@@ -1,20 +1,20 @@
 package server
-import (
-	"testing"
-	"github.com/ngaut/log"
-	"time"
-	"database/sql"
-	"github.com/pingcap/mp/protocol"
-	_ "github.com/go-sql-driver/mysql"
-)
 
+import (
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/ngaut/log"
+	"github.com/pingcap/mp/protocol"
+	"testing"
+	"time"
+)
 
 func TestCRUD(t *testing.T) {
 	cfg := &Config{
-		Addr:":4000",
-		User:"root",
-		Password:"root",
-		LogLevel:"debug",
+		Addr:     ":4000",
+		User:     "root",
+		Password: "root",
+		LogLevel: "debug",
 	}
 
 	mockDrv := NewMockDriver()
@@ -31,9 +31,9 @@ func TestCRUD(t *testing.T) {
 		log.Fatal(err)
 	}
 	_ = db
-//	err = db.Ping()
-//	if err != nil {
-//		log.Fatal(err)
-//	}
+	//	err = db.Ping()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
 
 }
