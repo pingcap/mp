@@ -140,6 +140,7 @@ func runTestCRUD(t *testing.T) {
 		} else {
 			dbt.Error("no data")
 		}
+		rows.Close()
 
 		// Update
 		res = dbt.mustExec("UPDATE test SET value = 0 WHERE value = 1")
@@ -165,6 +166,7 @@ func runTestCRUD(t *testing.T) {
 		} else {
 			dbt.Error("no data")
 		}
+		rows.Close()
 
 		// Delete
 		res = dbt.mustExec("DELETE FROM test WHERE value = 0")

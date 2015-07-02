@@ -36,8 +36,7 @@ func main() {
 	log.CrashLog("./cm-proxy.dump")
 
 	var svr *server.Server
-	drv := server.NewMockDriver()
-	svr, err = server.NewServer(cfg, drv)
+	svr, err = server.NewServer(cfg, server.NewQlDriver())
 	if err != nil {
 		log.Error(err.Error())
 		return
