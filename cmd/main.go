@@ -36,7 +36,7 @@ func main() {
 	log.CrashLog("./cm-proxy.dump")
 
 	var svr *server.Server
-	svr, err = server.NewServer(cfg)
+	svr, err = server.NewServer(cfg, server.NewQlDriver())
 	if err != nil {
 		log.Error(err.Error())
 		return

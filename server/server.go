@@ -53,7 +53,7 @@ func (s *Server) newConn(co net.Conn) *Conn {
 		collation:    protocol.DEFAULT_COLLATION_ID,
 		charset:      protocol.DEFAULT_CHARSET,
 		alloc:        arena.NewArenaAllocator(32 * 1024),
-		ctx:          s.driver.GetCtx(),
+		ctx:          s.driver.OpenCtx(),
 	}
 	c.salt, _ = protocol.RandomBuf(20)
 
