@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"github.com/ngaut/arena"
 	"github.com/pingcap/mp/protocol"
 	"github.com/pingcap/ql"
@@ -56,6 +57,17 @@ func (column *ColumnInfo) Dump(alloc arena.ArenaAllocator) []byte {
 type Result struct {
 	Columns []*ColumnInfo
 	Rows    [][]interface{}
+	RowData [][]byte
+}
+
+func (res *Result) String() string {
+	b, _ := json.MarshalIndent(res, "", "\t")
+	return string(b)
+}
+
+func (res *Result) AddRow(values ...interface{}) {
+	res.Rows = append(res.Rows, values)
+
 }
 
 type SessionCtx interface {
@@ -66,6 +78,6 @@ type SessionCtx interface {
 
 type IDriver interface {
 	Execute(sql string, ctx ql.SessionCtx) (*Result, error)
-	GetCtx() ql.SessionCtx
+	OpenCtx() ql.SessionCtx
 	CloseCtx(ql.SessionCtx) error
 }

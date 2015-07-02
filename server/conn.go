@@ -271,7 +271,7 @@ func (c *Conn) writeOK() error {
 		return errors.Trace(err)
 	}
 
-	return nil
+	return errors.Trace(c.flush())
 }
 
 func (c *Conn) writeError(e error) error {
@@ -316,8 +316,11 @@ func (c *Conn) handleQuery(sql string) (err error) {
 	if err != nil {
 		return err
 	}
-	c.writeResultset(rs)
-	c.writeOK()
+	if rs != nil {
+		c.writeResultset(rs)
+	} else {
+		c.writeOK()
+	}
 	return
 }
 

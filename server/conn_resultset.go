@@ -70,7 +70,7 @@ func (c *Conn) writeResultset(rs *Result) error {
 			if err != nil {
 				return errors.Trace(err)
 			}
-			data = append(data, valData...)
+			data = append(data, PutLengthEncodedString(valData, c.alloc)...)
 		}
 
 		if err := c.writePacket(data); err != nil {
