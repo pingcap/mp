@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/ngaut/arena"
 	"github.com/pingcap/mp/protocol"
-	"github.com/pingcap/ql"
 )
 
 type ColumnInfo struct {
@@ -65,19 +64,21 @@ func (res *Result) String() string {
 	return string(b)
 }
 
-func (res *Result) AddRow(values ...interface{}) {
+func (res *Result) AddRow(values ...interface{}) *Result {
 	res.Rows = append(res.Rows, values)
-
+	return res
 }
 
-type SessionCtx interface {
+type Context interface {
 	Status() uint16
 	LastInsertId() uint64
 	AffectedRows() uint64
+	CurrentDatabase() string
 }
 
 type IDriver interface {
-	Execute(sql string, ctx ql.SessionCtx) (*Result, error)
-	OpenCtx() ql.SessionCtx
-	CloseCtx(ql.SessionCtx) error
+	Execute(sql string, ctx Context) (*Result, error)
+	OpenCtx() Context
+	CloseCtx(Context) error
+	FieldList(tableName string, ctx Context) (columns []*ColumnInfo)
 }

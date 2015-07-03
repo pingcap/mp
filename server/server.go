@@ -78,7 +78,7 @@ func NewServer(cfg *Config, driver IDriver) (*Server, error) {
 		cfg:               cfg,
 		driver:            driver,
 		concurrentLimiter: tokenlimiter.NewTokenLimiter(100),
-		counter:           stats.NewCounters("stats"),
+		counter:           stats.NewCounters(""),
 		rwlock:            &sync.RWMutex{},
 		clients:           make(map[uint32]*Conn),
 	}

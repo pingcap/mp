@@ -9,9 +9,35 @@ import (
 	"time"
 )
 
-func TestCRUD(t *testing.T) {
+//used to test mysql console client.
+func TestLong(t *testing.T) {
 	cfg := &Config{
 		Addr:     ":4000",
+		User:     "root",
+		Password: "",
+		LogLevel: "debug",
+	}
+	status := protocol.SERVER_STATUS_AUTOCOMMIT
+	mockDrv := NewMockDriver()
+	mockDrv.InitColumns("..@@version_comment|varchar.255|", "test.test.value|tiny.1|")
+	result := mockDrv.BuildResult("..@@version_comment").AddRow(protocol.DefaultVariables["version_comment"].Value)
+	mockDrv.AddQuery("select @@version_comment limit 1", result, status, 0, 0)
+	result = mockDrv.BuildResult("..DATABASE()").AddRow("")
+	mockDrv.AddQuery("SELECT DATABASE()", result, status, 0, 0)
+	mockDrv.AddQuery("use test", nil, status, 0, 0)
+	mockDrv.AddQuery("show databases", mockDrv.BuildResult("..Database").AddRow("test"), status, 0, 0)
+	mockDrv.AddQuery("show tables", mockDrv.BuildResult("..Tables_in_test").AddRow("test"), status, 0, 0)
+	serv, err := NewServer(cfg, mockDrv)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_ = serv
+	//	serv.Run()
+}
+
+func TestCRUD(t *testing.T) {
+	cfg := &Config{
+		Addr:     ":4001",
 		User:     "root",
 		Password: "",
 		LogLevel: "debug",
@@ -97,7 +123,7 @@ func (dbt *DBTest) mustQuery(query string, args ...interface{}) (rows *sql.Rows)
 }
 
 func runTestCRUD(t *testing.T) {
-	runTests(t, "root@tcp(localhost:4000)/test", func(dbt *DBTest) {
+	runTests(t, "root@tcp(localhost:4001)/test", func(dbt *DBTest) {
 		// Create Table
 		dbt.mustExec("CREATE TABLE test (value BOOL)")
 
