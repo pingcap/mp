@@ -32,7 +32,7 @@ type Conn struct {
 	salt         []byte
 	alloc        arena.ArenaAllocator
 	lastCmd      string
-	ctx          SessionCtx
+	ctx          Context
 }
 
 func (c *Conn) String() string {
@@ -51,7 +51,7 @@ func (c *Conn) Handshake() error {
 		return errors.Trace(err)
 	}
 
-	err := c.writeOkFlush()
+	err := c.writeOK()
 	c.pkg.Sequence = 0
 
 	return err
@@ -207,19 +207,20 @@ func (c *Conn) dispatch(data []byte) error {
 
 	switch protocol.MYSQL_COMMAND(cmd) {
 	case protocol.COM_QUIT:
+		c.server.driver.CloseCtx(c.ctx)
 		c.Close()
 		return nil
 	case protocol.COM_QUERY:
 		return c.handleQuery(hack.String(data))
 	case protocol.COM_PING:
-		return c.writeOkFlush()
+		return c.writeOK()
 	case protocol.COM_INIT_DB:
 		log.Debug(cmd, hack.String(data))
 		if err := c.useDB(hack.String(data)); err != nil {
 			return errors.Trace(err)
 		}
 
-		return c.writeOkFlush()
+		return c.writeOK()
 	case protocol.COM_FIELD_LIST:
 		return c.handleFieldList(hack.String(data))
 	case protocol.COM_STMT_PREPARE:
@@ -247,13 +248,6 @@ func (c *Conn) useDB(db string) (err error) {
 
 func (c *Conn) flush() error {
 	return c.pkg.Flush()
-}
-
-func (c *Conn) writeOkFlush() error {
-	if err := c.writeOK(); err != nil {
-		return errors.Trace(err)
-	}
-	return errors.Trace(c.flush())
 }
 
 func (c *Conn) writeOK() error {
@@ -324,8 +318,24 @@ func (c *Conn) handleQuery(sql string) (err error) {
 	return
 }
 
+func (c *Conn) writeFieldList(status uint16, fs []*ColumnInfo) error {
+	data := make([]byte, 4, 1024)
+	for _, v := range fs {
+		data = data[0:4]
+		data = append(data, v.Dump(c.alloc)...)
+		if err := c.writePacket(data); err != nil {
+			return err
+		}
+	}
+	if err := c.writeEOF(c.ctx.Status()); err != nil {
+		return err
+	}
+	return errors.Trace(c.flush())
+}
+
 func (c *Conn) handleFieldList(sql string) (err error) {
-	return c.writeError(nil)
+	columns := c.server.driver.FieldList(sql, c.ctx)
+	return c.writeFieldList(c.ctx.Status(), columns)
 }
 
 func (c *Conn) handleStmtPrepare(sql string) (err error) {
@@ -345,9 +355,5 @@ func (c *Conn) handleStmtSendLongData(sql string) (err error) {
 }
 
 func (c *Conn) handleStmtReset(sql string) (err error) {
-	return c.writeError(nil)
-}
-
-func (c *Conn) handleShow(sql string) (err error) {
 	return c.writeError(nil)
 }

@@ -3,7 +3,6 @@ package server
 import (
 	"errors"
 	. "github.com/pingcap/mp/protocol"
-	"github.com/pingcap/ql"
 	"strconv"
 	"strings"
 )
@@ -24,6 +23,10 @@ func (mCtx *MockCtx) LastInsertId() uint64 {
 
 func (mCtx *MockCtx) AffectedRows() uint64 {
 	return mCtx.affectedRows
+}
+
+func (mCtx *MockCtx) CurrentDatabase() string {
+	return "test"
 }
 
 type MockDriver struct {
@@ -162,6 +165,11 @@ func ParseColumn(columnDef string) *ColumnInfo {
 func (mql *MockDriver) BuildResult(columns ...string) *Result {
 	res := new(Result)
 	for _, col := range columns {
+		column := mql.columnMap[col]
+		if column == nil {
+			column = ParseColumn(col + "|varchar.255|")
+			mql.columnMap[col] = column
+		}
 		res.Columns = append(res.Columns, mql.columnMap[col])
 	}
 	return res
@@ -175,11 +183,11 @@ func (mql *MockDriver) AddQuery(sql string, result interface{}, status uint16, l
 	mql.ctxes = append(mql.ctxes, &MockCtx{status, lastInsertId, affectedRows})
 }
 
-func (mql *MockDriver) OpenCtx() ql.SessionCtx {
+func (mql *MockDriver) OpenCtx() Context {
 	return &MockCtx{SERVER_STATUS_AUTOCOMMIT, 0, 0}
 }
 
-func (mql *MockDriver) Execute(sql string, ctx ql.SessionCtx) (rs *Result, err error) {
+func (mql *MockDriver) Execute(sql string, ctx Context) (rs *Result, err error) {
 	if mql.exeIdx == len(mql.inputs) {
 		err = errors.New("[mock]no more results to execute:" + sql)
 		return
@@ -201,6 +209,16 @@ func (mql *MockDriver) Execute(sql string, ctx ql.SessionCtx) (rs *Result, err e
 	return
 }
 
-func (mql *MockDriver) CloseCtx(ctx ql.SessionCtx) error {
+func (mql *MockDriver) CloseCtx(ctx Context) error {
 	return nil
+}
+
+func (mql *MockDriver) FieldList(tableName string, ctx Context) (columns []*ColumnInfo) {
+	prefix := ctx.CurrentDatabase() + "." + tableName + "."
+	for k, v := range mql.columnMap {
+		if strings.HasPrefix(k, prefix) {
+			columns = append(columns, v)
+		}
+	}
+	return
 }
