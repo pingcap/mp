@@ -14,8 +14,8 @@ func (qc *QlContext) Status() uint16 {
 	return qc.sessionCtx.Status()
 }
 
-func (qc *QlContext) LastInsertId() uint64 {
-	return qc.sessionCtx.LastInsertId()
+func (qc *QlContext) LastInsertID() uint64 {
+	return qc.sessionCtx.LastInsertID()
 }
 
 func (qc *QlContext) AffectedRows() uint64 {
@@ -35,7 +35,7 @@ func (q *QlDriver) OpenCtx() Context {
 	return &QlContext{qctx, ""}
 }
 
-func (q *QlDriver) CloseCtx() (err error) {
+func (q *QlDriver) CloseCtx(ctx Context) (err error) {
 	return
 }
 

@@ -2,10 +2,11 @@ package server
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/juju/errors"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mp/protocol"
-	"strconv"
 )
 
 func formatValue(value interface{}) ([]byte, error) {
