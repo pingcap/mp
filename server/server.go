@@ -10,6 +10,7 @@ import (
 	stats "github.com/ngaut/gostats"
 	"github.com/ngaut/log"
 	"github.com/ngaut/tokenlimiter"
+	"github.com/pingcap/mp/etc"
 	"github.com/pingcap/mp/protocol"
 )
 
@@ -18,7 +19,7 @@ var (
 )
 
 type Server struct {
-	cfg               *Config
+	cfg               *etc.Config
 	driver            IDriver
 	listener          net.Listener
 	rwlock            *sync.RWMutex
@@ -72,7 +73,7 @@ func (s *Server) CfgGetPwd(user string) string {
 	return s.cfg.Password //TODO support multiple users
 }
 
-func NewServer(cfg *Config, driver IDriver) (*Server, error) {
+func NewServer(cfg *etc.Config, driver IDriver) (*Server, error) {
 	log.Warningf("%#v", cfg)
 	s := &Server{
 		cfg:               cfg,

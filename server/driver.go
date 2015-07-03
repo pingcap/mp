@@ -54,18 +54,18 @@ func (column *ColumnInfo) Dump(alloc arena.ArenaAllocator) []byte {
 	return data
 }
 
-type Result struct {
+type ResultSet struct {
 	Columns []*ColumnInfo
 	Rows    [][]interface{}
 	RowData [][]byte
 }
 
-func (res *Result) String() string {
+func (res *ResultSet) String() string {
 	b, _ := json.MarshalIndent(res, "", "\t")
 	return string(b)
 }
 
-func (res *Result) AddRow(values ...interface{}) *Result {
+func (res *ResultSet) AddRow(values ...interface{}) *ResultSet {
 	res.Rows = append(res.Rows, values)
 	return res
 }
@@ -78,7 +78,7 @@ type Context interface {
 }
 
 type IDriver interface {
-	Execute(sql string, ctx Context) (*Result, error)
+	Execute(sql string, ctx Context) (*ResultSet, error)
 	OpenCtx() Context
 	CloseCtx(Context) error
 	FieldList(tableName string, ctx Context) (columns []*ColumnInfo)

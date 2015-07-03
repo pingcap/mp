@@ -44,7 +44,7 @@ func formatValue(value interface{}) ([]byte, error) {
 	}
 }
 
-func (c *Conn) writeResultset(rs *Result) error {
+func (c *Conn) writeResultset(rs *ResultSet) error {
 	columnLen := PutLengthEncodedInt(uint64(len(rs.Columns)))
 	data := c.alloc.AllocBytesWithLen(4, 1024)
 	data = append(data, columnLen...)

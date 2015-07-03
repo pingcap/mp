@@ -26,7 +26,7 @@ func (qc *QlContext) CurrentDatabase() string {
 	return qc.currentDatabase
 }
 
-func (q *QlDriver) Execute(sql string, ctx Context) (rs *Result, err error) {
+func (q *QlDriver) Execute(sql string, ctx Context) (rs *ResultSet, err error) {
 	return
 }
 
@@ -36,6 +36,12 @@ func (q *QlDriver) OpenCtx() Context {
 }
 
 func (q *QlDriver) CloseCtx(ctx Context) (err error) {
+	qc := ctx.(ql.SessionCtx)
+	_ = qc
+	return
+}
+
+func converColumnInfo(table string, qci *ql.ColumnInfo) (ci *ColumnInfo) {
 	return
 }
 

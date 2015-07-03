@@ -33,6 +33,7 @@ type Conn struct {
 	alloc        arena.ArenaAllocator
 	lastCmd      string
 	ctx          Context
+	stmts        map[int]string
 }
 
 func (c *Conn) String() string {
@@ -336,24 +337,4 @@ func (c *Conn) writeFieldList(status uint16, fs []*ColumnInfo) error {
 func (c *Conn) handleFieldList(sql string) (err error) {
 	columns := c.server.driver.FieldList(sql, c.ctx)
 	return c.writeFieldList(c.ctx.Status(), columns)
-}
-
-func (c *Conn) handleStmtPrepare(sql string) (err error) {
-	return c.writeError(nil)
-}
-
-func (c *Conn) handleStmtExecute(sql string) (err error) {
-	return c.writeError(nil)
-}
-
-func (c *Conn) handleStmtClose(sql string) (err error) {
-	return c.writeError(nil)
-}
-
-func (c *Conn) handleStmtSendLongData(sql string) (err error) {
-	return c.writeError(nil)
-}
-
-func (c *Conn) handleStmtReset(sql string) (err error) {
-	return c.writeError(nil)
 }

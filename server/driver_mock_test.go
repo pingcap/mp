@@ -163,8 +163,8 @@ func ParseColumn(columnDef string) *ColumnInfo {
 
 // Create result with columns info.
 // Column name is defined as "schema.table.column"
-func (mql *MockDriver) BuildResult(columns ...string) *Result {
-	res := new(Result)
+func (mql *MockDriver) BuildResult(columns ...string) *ResultSet {
+	res := new(ResultSet)
 	for _, col := range columns {
 		column := mql.columnMap[col]
 		if column == nil {
@@ -188,7 +188,7 @@ func (mql *MockDriver) OpenCtx() Context {
 	return &MockCtx{SERVER_STATUS_AUTOCOMMIT, 0, 0}
 }
 
-func (mql *MockDriver) Execute(sql string, ctx Context) (rs *Result, err error) {
+func (mql *MockDriver) Execute(sql string, ctx Context) (rs *ResultSet, err error) {
 	if mql.exeIdx == len(mql.inputs) {
 		err = errors.New("[mock]no more results to execute:" + sql)
 		return
@@ -199,8 +199,8 @@ func (mql *MockDriver) Execute(sql string, ctx Context) (rs *Result, err error) 
 	}
 	op := mql.outputs[mql.exeIdx]
 	switch op.(type) {
-	case *Result:
-		rs = op.(*Result)
+	case *ResultSet:
+		rs = op.(*ResultSet)
 	case error:
 		err = op.(error)
 	}
