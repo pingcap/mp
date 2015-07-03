@@ -4,11 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/binary"
-
 	"fmt"
-	"github.com/ngaut/arena"
 	"io"
 	"runtime"
+
+	"github.com/ngaut/arena"
 )
 
 func Pstack() string {

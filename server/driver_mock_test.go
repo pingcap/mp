@@ -2,14 +2,15 @@ package server
 
 import (
 	"errors"
-	. "github.com/pingcap/mp/protocol"
 	"strconv"
 	"strings"
+
+	. "github.com/pingcap/mp/protocol"
 )
 
 type MockCtx struct {
 	status       uint16
-	lastInsertId uint64
+	lastInsertID uint64
 	affectedRows uint64
 }
 
@@ -17,8 +18,8 @@ func (mCtx *MockCtx) Status() uint16 {
 	return mCtx.status
 }
 
-func (mCtx *MockCtx) LastInsertId() uint64 {
-	return mCtx.lastInsertId
+func (mCtx *MockCtx) LastInsertID() uint64 {
+	return mCtx.lastInsertID
 }
 
 func (mCtx *MockCtx) AffectedRows() uint64 {

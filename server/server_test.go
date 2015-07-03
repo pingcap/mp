@@ -2,11 +2,12 @@ package server
 
 import (
 	"database/sql"
+	"testing"
+	"time"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/protocol"
-	"testing"
-	"time"
 )
 
 //used to test mysql console client.

@@ -37,7 +37,7 @@ type Conn struct {
 
 func (c *Conn) String() string {
 	return fmt.Sprintf("conn: %s, status: %d, charset: %s, user: %s, lastInsertId: %d",
-		c.c.RemoteAddr(), c.ctx.Status(), c.charset, c.user, c.ctx.LastInsertId(),
+		c.c.RemoteAddr(), c.ctx.Status(), c.charset, c.user, c.ctx.LastInsertID(),
 	)
 }
 
@@ -254,7 +254,7 @@ func (c *Conn) writeOK() error {
 	data := c.alloc.AllocBytesWithLen(4, 32)
 	data = append(data, protocol.OK_HEADER)
 	data = append(data, protocol.PutLengthEncodedInt(uint64(c.ctx.AffectedRows()))...)
-	data = append(data, protocol.PutLengthEncodedInt(uint64(c.ctx.LastInsertId()))...)
+	data = append(data, protocol.PutLengthEncodedInt(uint64(c.ctx.LastInsertID()))...)
 	if c.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, byte(c.ctx.Status()), byte(c.ctx.Status()>>8))
 		data = append(data, 0, 0)

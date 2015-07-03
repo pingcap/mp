@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+
 	"github.com/ngaut/arena"
 	"github.com/pingcap/mp/protocol"
 )
@@ -71,7 +72,7 @@ func (res *Result) AddRow(values ...interface{}) *Result {
 
 type Context interface {
 	Status() uint16
-	LastInsertId() uint64
+	LastInsertID() uint64
 	AffectedRows() uint64
 	CurrentDatabase() string
 }
