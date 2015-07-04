@@ -3,6 +3,7 @@ package server
 import (
 	"strconv"
 	"strings"
+	"github.com/pingcap/mp/hack"
 )
 
 func (c *Conn) handleStmtPrepare(sql string) (err error) {
@@ -43,56 +44,11 @@ func reserveBuffer(buf []byte, appendSize int) []byte {
 // characters, and turning others into specific escape sequences, such as
 // turning newlines into \n and null bytes into \0.
 // https://github.com/mysql/mysql-server/blob/mysql-5.7.5/mysys/charset.c#L823-L932
-func escapeBytesBackslash(buf, v []byte) []byte {
+func escapeBackslash(buf, v []byte) []byte {
 	pos := len(buf)
 	buf = reserveBuffer(buf, len(v)*2)
 
 	for _, c := range v {
-		switch c {
-		case '\x00':
-			buf[pos] = '\\'
-			buf[pos+1] = '0'
-			pos += 2
-		case '\n':
-			buf[pos] = '\\'
-			buf[pos+1] = 'n'
-			pos += 2
-		case '\r':
-			buf[pos] = '\\'
-			buf[pos+1] = 'r'
-			pos += 2
-		case '\x1a':
-			buf[pos] = '\\'
-			buf[pos+1] = 'Z'
-			pos += 2
-		case '\'':
-			buf[pos] = '\\'
-			buf[pos+1] = '\''
-			pos += 2
-		case '"':
-			buf[pos] = '\\'
-			buf[pos+1] = '"'
-			pos += 2
-		case '\\':
-			buf[pos] = '\\'
-			buf[pos+1] = '\\'
-			pos += 2
-		default:
-			buf[pos] = c
-			pos += 1
-		}
-	}
-
-	return buf[:pos]
-}
-
-// escapeStringBackslash is similar to escapeBytesBackslash but for string.
-func escapeStringBackslash(buf []byte, v string) []byte {
-	pos := len(buf)
-	buf = reserveBuffer(buf, len(v)*2)
-
-	for i := 0; i < len(v); i++ {
-		c := v[i]
 		switch c {
 		case '\x00':
 			buf[pos] = '\\'
@@ -136,31 +92,11 @@ func escapeStringBackslash(buf []byte, v string) []byte {
 // it contains. This is used when the NO_BACKSLASH_ESCAPES SQL_MODE is in
 // effect on the server.
 // https://github.com/mysql/mysql-server/blob/mysql-5.7.5/mysys/charset.c#L963-L1038
-func escapeBytesQuotes(buf, v []byte) []byte {
+func escapeQuotes(buf, v []byte) []byte {
 	pos := len(buf)
 	buf = reserveBuffer(buf, len(v)*2)
 
 	for _, c := range v {
-		if c == '\'' {
-			buf[pos] = '\''
-			buf[pos+1] = '\''
-			pos += 2
-		} else {
-			buf[pos] = c
-			pos++
-		}
-	}
-
-	return buf[:pos]
-}
-
-// escapeStringQuotes is similar to escapeBytesQuotes but for string.
-func escapeStringQuotes(buf []byte, v string) []byte {
-	pos := len(buf)
-	buf = reserveBuffer(buf, len(v)*2)
-
-	for i := 0; i < len(v); i++ {
-		c := v[i]
 		if c == '\'' {
 			buf[pos] = '\''
 			buf[pos+1] = '\''
@@ -179,7 +115,7 @@ func interpolateParams(query string, noBackslashEscapes bool, args ...interface{
 	argPos := 0
 
 	for i := 0; i < len(query); i++ {
-		q := strings.IndexByte(query[i:], '?')
+		q := strings.IndexByte(query[i:], '?') //TODO handle the case when "?" in quotes.
 		if q == -1 {
 			buf = append(buf, query[i:]...)
 			break
@@ -214,18 +150,18 @@ func interpolateParams(query string, noBackslashEscapes bool, args ...interface{
 			} else {
 				buf = append(buf, '\'')
 				if noBackslashEscapes {
-					buf = escapeBytesQuotes(buf, v)
+					buf = escapeQuotes(buf, v)
 				} else {
-					buf = escapeBytesBackslash(buf, v)
+					buf = escapeBackslash(buf, v)
 				}
 				buf = append(buf, '\'')
 			}
 		case string:
 			buf = append(buf, '\'')
 			if noBackslashEscapes {
-				buf = escapeStringQuotes(buf, v)
+				buf = escapeQuotes(buf, hack.Slice(v))
 			} else {
-				buf = escapeStringBackslash(buf, v)
+				buf = escapeBackslash(buf, v)
 			}
 			buf = append(buf, '\'')
 		default:

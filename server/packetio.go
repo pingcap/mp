@@ -1,10 +1,12 @@
-package protocol
+package server
 
 import (
 	"bufio"
 	"fmt"
 	"io"
 	"net"
+
+	. "github.com/pingcap/mp/protocol"
 )
 
 type PacketIO struct {
