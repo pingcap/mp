@@ -6,9 +6,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"runtime"
+	"strconv"
 
 	"github.com/ngaut/arena"
+	"github.com/pingcap/mp/hack"
+	. "github.com/pingcap/mp/protocol"
 )
 
 func Pstack() string {
@@ -117,7 +121,7 @@ func PutLengthEncodedInt(n uint64) []byte {
 	return nil
 }
 
-func LengthEnodedString(b []byte) ([]byte, bool, int, error) {
+func LengthEncodedBytes(b []byte) ([]byte, bool, int, error) {
 	// Get length
 	num, isNull, n := LengthEncodedInt(b)
 	if num < 1 {
@@ -132,6 +136,23 @@ func LengthEnodedString(b []byte) ([]byte, bool, int, error) {
 	}
 
 	return nil, false, n, io.EOF
+}
+
+func LengthEncodedString(b []byte) (string, bool, int, error) {
+	// Get length
+	num, isNull, n := LengthEncodedInt(b)
+	if num < 1 {
+		return "", isNull, n, nil
+	}
+
+	n += int(num)
+
+	// Check data length
+	if len(b) >= n {
+		return hack.String(b[n-int(num) : n]), false, n, nil
+	}
+
+	return "", false, n, io.EOF
 }
 
 func SkipLengthEnodedString(b []byte) (int, error) {
@@ -320,4 +341,226 @@ func init() {
 	}
 
 	defCache = PutLengthEncodedString([]byte("def"), arena.StdAllocator)
+}
+
+func ParseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{}, error) {
+	values := make([]interface{}, len(columns))
+	if rowData[0] != OK_HEADER {
+		return nil, ErrMalformPacket
+	}
+
+	pos := 1 + ((len(columns) + 7 + 2) >> 3)
+
+	nullBitmap := rowData[1:pos]
+
+	var isUnsigned bool
+	var isNull bool
+	var err error
+	var n int
+	var v []byte
+	for i := range values {
+		if nullBitmap[(i+2)/8]&(1<<(uint(i+2)%8)) > 0 {
+			values[i] = nil
+			continue
+		}
+
+		isUnsigned = columns[i].Flag&UNSIGNED_FLAG > 0
+
+		switch columns[i].Type {
+		case MYSQL_TYPE_NULL:
+			values[i] = nil
+			continue
+
+		case MYSQL_TYPE_TINY:
+			if isUnsigned {
+				values[i] = uint64(rowData[pos])
+			} else {
+				values[i] = int64(rowData[pos])
+			}
+			pos++
+			continue
+
+		case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
+			if isUnsigned {
+				values[i] = uint64(binary.LittleEndian.Uint16(rowData[pos : pos+2]))
+			} else {
+				values[i] = int64((binary.LittleEndian.Uint16(rowData[pos : pos+2])))
+			}
+			pos += 2
+			continue
+
+		case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+			if isUnsigned {
+				values[i] = uint64(binary.LittleEndian.Uint32(rowData[pos : pos+4]))
+			} else {
+				values[i] = int64(binary.LittleEndian.Uint32(rowData[pos : pos+4]))
+			}
+			pos += 4
+			continue
+
+		case MYSQL_TYPE_LONGLONG:
+			if isUnsigned {
+				values[i] = binary.LittleEndian.Uint64(rowData[pos : pos+8])
+			} else {
+				values[i] = int64(binary.LittleEndian.Uint64(rowData[pos : pos+8]))
+			}
+			pos += 8
+			continue
+
+		case MYSQL_TYPE_FLOAT:
+			values[i] = float64(math.Float32frombits(binary.LittleEndian.Uint32(rowData[pos : pos+4])))
+			pos += 4
+			continue
+
+		case MYSQL_TYPE_DOUBLE:
+			values[i] = math.Float64frombits(binary.LittleEndian.Uint64(rowData[pos : pos+8]))
+			pos += 8
+			continue
+
+		case MYSQL_TYPE_DECIMAL, MYSQL_TYPE_NEWDECIMAL, MYSQL_TYPE_VARCHAR,
+			MYSQL_TYPE_BIT, MYSQL_TYPE_ENUM, MYSQL_TYPE_SET, MYSQL_TYPE_TINY_BLOB,
+			MYSQL_TYPE_MEDIUM_BLOB, MYSQL_TYPE_LONG_BLOB, MYSQL_TYPE_BLOB,
+			MYSQL_TYPE_VAR_STRING, MYSQL_TYPE_STRING, MYSQL_TYPE_GEOMETRY:
+			v, isNull, n, err = LengthEncodedBytes(rowData[pos:])
+			pos += n
+			if err != nil {
+				return nil, err
+			}
+
+			if !isNull {
+				values[i] = v
+				continue
+			} else {
+				values[i] = nil
+				continue
+			}
+		case MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE:
+			var num uint64
+			num, isNull, n = LengthEncodedInt(rowData[pos:])
+
+			pos += n
+
+			if isNull {
+				values[i] = nil
+				continue
+			}
+
+			values[i], err = FormatBinaryDate(int(num), rowData[pos:])
+			pos += int(num)
+
+			if err != nil {
+				return nil, err
+			}
+
+		case MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_DATETIME:
+			var num uint64
+			num, isNull, n = LengthEncodedInt(rowData[pos:])
+
+			pos += n
+
+			if isNull {
+				values[i] = nil
+				continue
+			}
+
+			values[i], err = FormatBinaryDateTime(int(num), rowData[pos:])
+			pos += int(num)
+
+			if err != nil {
+				return nil, err
+			}
+
+		case MYSQL_TYPE_TIME:
+			var num uint64
+			num, isNull, n = LengthEncodedInt(rowData[pos:])
+
+			pos += n
+
+			if isNull {
+				values[i] = nil
+				continue
+			}
+
+			values[i], err = FormatBinaryTime(int(num), rowData[pos:])
+			pos += int(num)
+
+			if err != nil {
+				return nil, err
+			}
+
+		default:
+			return nil, fmt.Errorf("Stmt Unknown FieldType %d %s", columns[i].Type, columns[i].Name)
+		}
+	}
+	return values, err
+}
+
+func ParseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interface{}, err error) {
+	values = make([]interface{}, len(columns))
+	var v []byte
+	var isNull, isUnsigned bool
+	var pos int = 0
+	var n int = 0
+	for i, col := range columns {
+		v, isNull, n, err = LengthEncodedBytes(rowData[pos:])
+		if err != nil {
+			return nil, err
+		}
+
+		pos += n
+
+		if isNull {
+			values[i] = nil
+		} else {
+			isUnsigned = (col.Flag&UNSIGNED_FLAG > 0)
+
+			switch col.Type {
+			case MYSQL_TYPE_TINY, MYSQL_TYPE_SHORT, MYSQL_TYPE_INT24,
+				MYSQL_TYPE_LONGLONG, MYSQL_TYPE_YEAR:
+				if isUnsigned {
+					values[i], err = strconv.ParseUint(string(v), 10, 64)
+				} else {
+					values[i], err = strconv.ParseInt(string(v), 10, 64)
+				}
+			case MYSQL_TYPE_FLOAT, MYSQL_TYPE_DOUBLE:
+				values[i], err = strconv.ParseFloat(string(v), 64)
+			default:
+				values[i] = v
+			}
+
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return
+}
+
+func EncodeRowValuesBinary(columns []*ColumnInfo, row []interface{}) (data []byte, err error) {
+	if len(columns) != len(row) {
+		err = ErrMalformPacket
+		return
+	}
+	data = append(data, OK_HEADER)
+	nullsLen := ((len(columns) + 7 + 2) / 8)
+	nulls := make([]byte, nullsLen)
+	for i, val := range row {
+		if val == nil {
+			byte_pos := (i + 2) / 8
+			bit_pos := byte((i + 2) % 8)
+			nulls[byte_pos] |= 1 << bit_pos
+		}
+	}
+	data = append(data, nulls...)
+	//TODO
+	//	for i, val := range row {
+	//		isUnsigned := columns[i].Flag&UNSIGNED_FLAG > 0
+	//
+	//
+	//		switch val.(type) {
+	//		case int, int64:
+	//
+	//		}
+	//	}
+	return
 }

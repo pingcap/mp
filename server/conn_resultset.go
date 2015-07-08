@@ -6,7 +6,6 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/pingcap/mp/hack"
-	. "github.com/pingcap/mp/protocol"
 )
 
 func formatValue(value interface{}) ([]byte, error) {
@@ -44,45 +43,52 @@ func formatValue(value interface{}) ([]byte, error) {
 	}
 }
 
-func (c *Conn) writeResultset(rs *ResultSet) error {
+func (cc *ClientConn) writeResultset(rs *ResultSet, binary bool) error {
 	columnLen := PutLengthEncodedInt(uint64(len(rs.Columns)))
-	data := c.alloc.AllocBytesWithLen(4, 1024)
+	data := cc.alloc.AllocBytesWithLen(4, 1024)
 	data = append(data, columnLen...)
-	if err := c.writePacket(data); err != nil {
+	if err := cc.writePacket(data); err != nil {
 		return errors.Trace(err)
 	}
 
 	for _, v := range rs.Columns {
 		data = data[0:4]
-		data = append(data, v.Dump(c.alloc)...)
-		if err := c.writePacket(data); err != nil {
+		data = append(data, v.Dump(cc.alloc)...)
+		if err := cc.writePacket(data); err != nil {
 			return errors.Trace(err)
 		}
 	}
 
-	if err := c.writeEOF(c.ctx.Status()); err != nil {
+	if err := cc.writeEOF(cc.ctx.Status()); err != nil {
 		return errors.Trace(err)
 	}
 	for _, row := range rs.Rows {
 		data = data[0:4]
-
-		for _, value := range row {
-			valData, err := formatValue(value)
+		if binary {
+			rowData, err := EncodeRowValuesBinary(rs.Columns, row)
 			if err != nil {
 				return errors.Trace(err)
 			}
-			data = append(data, PutLengthEncodedString(valData, c.alloc)...)
+			data = append(data, rowData...)
+		} else {
+			for _, value := range row {
+				valData, err := formatValue(value)
+				if err != nil {
+					return errors.Trace(err)
+				}
+				data = append(data, PutLengthEncodedString(valData, cc.alloc)...)
+			}
 		}
 
-		if err := c.writePacket(data); err != nil {
+		if err := cc.writePacket(data); err != nil {
 			return errors.Trace(err)
 		}
 	}
 
-	err := c.writeEOF(c.ctx.Status())
+	err := cc.writeEOF(cc.ctx.Status())
 	if err != nil {
 		return errors.Trace(err)
 	}
 
-	return errors.Trace(c.flush())
+	return errors.Trace(cc.flush())
 }

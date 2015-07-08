@@ -4,38 +4,18 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/ngaut/log"
+	"github.com/pingcap/mp/etc"
 	. "github.com/pingcap/mp/protocol"
+	. "gopkg.in/check.v1"
 )
-
-type MockCtx struct {
-	status       uint16
-	lastInsertID uint64
-	affectedRows uint64
-}
-
-func (mCtx *MockCtx) Status() uint16 {
-	return mCtx.status
-}
-
-func (mCtx *MockCtx) LastInsertID() uint64 {
-	return mCtx.lastInsertID
-}
-
-func (mCtx *MockCtx) AffectedRows() uint64 {
-	return mCtx.affectedRows
-}
-
-func (mCtx *MockCtx) CurrentDatabase() string {
-	return "test"
-}
 
 type MockDriver struct {
 	columnMap map[string]*ColumnInfo
-	exeIdx    int
-	inputs    []string
-	outputs   []interface{}
-	ctxes     []*MockCtx
+	ctx       *MockCtx
 }
 
 func NewMockDriver() *MockDriver {
@@ -176,19 +156,63 @@ func (mql *MockDriver) BuildResult(columns ...string) *ResultSet {
 	return res
 }
 
+func (mql *MockDriver) OpenCtx() (ctx Context, err error) {
+	if mql.ctx == nil {
+		mql.ctx = &MockCtx{
+			columnMap: mql.columnMap,
+		}
+		mql.ctx.AddQuery("", nil, 0, 0, 0)
+	}
+	ctx = mql.ctx
+	return
+}
+
+type MockCtx struct {
+	columnMap    map[string]*ColumnInfo
+	inputs       []string
+	outputs      []interface{}
+	status       []uint16
+	lastInsertID []uint64
+	affectedRows []uint64
+	exeIdx       int
+}
+
+func (mCtx *MockCtx) Status() uint16 {
+	return mCtx.status[mCtx.exeIdx]
+}
+
+func (mCtx *MockCtx) LastInsertID() uint64 {
+	return mCtx.lastInsertID[mCtx.exeIdx]
+}
+
+func (mCtx *MockCtx) AffectedRows() uint64 {
+	return mCtx.affectedRows[mCtx.exeIdx]
+}
+
+func (mCtx *MockCtx) CurrentDB() string {
+	return "test"
+}
+
+func (mCtx *MockCtx) Close() (err error) {
+	return
+}
+
+func (mCtx *MockCtx) Prepare(sql string) (stmt Statement, err error) {
+	return
+}
+
 //Add predefined query and result for testing.
 //Result type can be *Result for result set response, error for error response, nil for ok response.
-func (mql *MockDriver) AddQuery(sql string, result interface{}, status uint16, lastInsertId, affectedRows uint64) {
+func (mql *MockCtx) AddQuery(sql string, result interface{}, status uint16, lastInsertId, affectedRows uint64) {
 	mql.inputs = append(mql.inputs, sql)
 	mql.outputs = append(mql.outputs, result)
-	mql.ctxes = append(mql.ctxes, &MockCtx{status, lastInsertId, affectedRows})
+	mql.status = append(mql.status, status)
+	mql.lastInsertID = append(mql.lastInsertID, lastInsertId)
+	mql.affectedRows = append(mql.affectedRows, affectedRows)
 }
 
-func (mql *MockDriver) OpenCtx() Context {
-	return &MockCtx{SERVER_STATUS_AUTOCOMMIT, 0, 0}
-}
-
-func (mql *MockDriver) Execute(sql string, ctx Context) (rs *ResultSet, err error) {
+func (mql *MockCtx) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
+	mql.exeIdx++
 	if mql.exeIdx == len(mql.inputs) {
 		err = errors.New("[mock]no more results to execute:" + sql)
 		return
@@ -204,22 +228,75 @@ func (mql *MockDriver) Execute(sql string, ctx Context) (rs *ResultSet, err erro
 	case error:
 		err = op.(error)
 	}
-	mctx := ctx.(*MockCtx)
-	*mctx = *(mql.ctxes[mql.exeIdx])
-	mql.exeIdx++
 	return
 }
 
-func (mql *MockDriver) CloseCtx(ctx Context) error {
-	return nil
-}
-
-func (mql *MockDriver) FieldList(tableName string, ctx Context) (columns []*ColumnInfo) {
-	prefix := ctx.CurrentDatabase() + "." + tableName + "."
+func (mql *MockCtx) FieldList(tableName string, wildCard string) (columns []*ColumnInfo, err error) {
+	prefix := mql.CurrentDB() + "." + tableName + "."
 	for k, v := range mql.columnMap {
 		if strings.HasPrefix(k, prefix) {
 			columns = append(columns, v)
 		}
 	}
 	return
+}
+
+func (mql *MockCtx) GetStatement(stmtId int) Statement {
+	return nil
+}
+
+type mockTestSuite struct {
+	mockDrv *MockDriver
+	server  *Server
+}
+
+//var _ = Suite(&mockTestSuite{})
+
+func (ts *mockTestSuite) SetUpSuite(c *C) {
+	ts.mockDrv = NewMockDriver()
+	cfg := &etc.Config{
+		Addr:     ":4000",
+		User:     "root",
+		Password: "",
+		LogLevel: "debug",
+	}
+	server, err := NewServer(cfg, ts.mockDrv)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ts.server = server
+	go ts.server.Run()
+	time.Sleep(time.Millisecond * 100)
+}
+
+func (ts *mockTestSuite) TearDownSuite(c *C) {
+	ts.server.Close()
+}
+
+func (ts *mockTestSuite) TestT(c *C) {
+	ts.mockDrv.InitColumns("test.test.val|tiny.1|")
+	status := SERVER_STATUS_AUTOCOMMIT
+	ctx, _ := ts.mockDrv.OpenCtx()
+
+	mockCtx := ctx.(*MockCtx)
+
+	mockCtx.AddQuery("use test", nil, status, 0, 0)
+	result := ts.mockDrv.BuildResult("..@@max_allowed_packet")
+	result.AddRow(16777216)
+	mockCtx.AddQuery("SELECT @@max_allowed_packet", result, status, 0, 0)
+	mockCtx.AddQuery("DROP TABLE IF EXISTS test", nil, status, 0, 0)
+	mockCtx.AddQuery("CREATE TABLE test (val TINYINT)", nil, status, 0, 0)
+	mockCtx.AddQuery("SELECT * FROM test", ts.mockDrv.BuildResult("test.test.val"), status, 0, 0)
+	mockCtx.AddQuery("INSERT INTO test VALUES (1)", nil, status, 0, 1)
+	result = ts.mockDrv.BuildResult("test.test.val")
+	result.AddRow(1)
+	mockCtx.AddQuery("SELECT val FROM test", result, status, 0, 0)
+	mockCtx.AddQuery("UPDATE test SET val = 0 WHERE val = 1", nil, status, 0, 1)
+	result = ts.mockDrv.BuildResult("test.test.val")
+	result.AddRow(0)
+	mockCtx.AddQuery("SELECT val FROM test", result, status, 0, 0)
+	mockCtx.AddQuery("DELETE FROM test WHERE val = 0", nil, status, 0, 1)
+	mockCtx.AddQuery("DELETE FROM test", nil, status, 0, 0)
+	mockCtx.AddQuery("DROP TABLE IF EXISTS test", nil, status, 0, 0)
+	runTestCRUD(c)
 }

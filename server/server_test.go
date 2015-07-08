@@ -3,80 +3,11 @@ package server
 import (
 	"database/sql"
 	"testing"
-	"time"
 
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/ngaut/log"
-	"github.com/pingcap/mp/etc"
-	"github.com/pingcap/mp/protocol"
 	. "gopkg.in/check.v1"
 )
 
-type testCRUDSuite struct {
-	mockDrv *MockDriver
-}
-
-func newTestCRUDSuite() *testCRUDSuite {
-	cfg := &etc.Config{
-		Addr:     ":4000",
-		User:     "root",
-		Password: "",
-		LogLevel: "debug",
-	}
-	ts := new(testCRUDSuite)
-	ts.mockDrv = NewMockDriver()
-	serv, err := NewServer(cfg, ts.mockDrv)
-	if err != nil {
-		log.Fatal(err)
-	}
-	go serv.Run()
-	time.Sleep(time.Millisecond * 100)
-	return ts
-}
-
-func (ts *testCRUDSuite) TestT(c *C) {
-	ts.mockDrv.InitColumns("test.test.value|tiny.1|")
-	status := protocol.SERVER_STATUS_AUTOCOMMIT
-	ts.mockDrv.AddQuery("use test", nil, status, 0, 0)
-	result := ts.mockDrv.BuildResult("..@@max_allowed_packet")
-	result.AddRow(16777216)
-	ts.mockDrv.AddQuery("SELECT @@max_allowed_packet", result, status, 0, 0)
-	ts.mockDrv.AddQuery("DROP TABLE IF EXISTS test", nil, status, 0, 0)
-	ts.mockDrv.AddQuery("CREATE TABLE test (value BOOL)", nil, status, 0, 0)
-	ts.mockDrv.AddQuery("SELECT * FROM test", ts.mockDrv.BuildResult("test.test.value"), status, 0, 0)
-	ts.mockDrv.AddQuery("INSERT INTO test VALUES (1)", nil, status, 0, 1)
-	result = ts.mockDrv.BuildResult("test.test.value")
-	result.AddRow(1)
-	ts.mockDrv.AddQuery("SELECT value FROM test", result, status, 0, 0)
-	ts.mockDrv.AddQuery("UPDATE test SET value = 0 WHERE value = 1", nil, status, 0, 1)
-	result = ts.mockDrv.BuildResult("test.test.value")
-	result.AddRow(0)
-	ts.mockDrv.AddQuery("SELECT value FROM test", result, status, 0, 0)
-	ts.mockDrv.AddQuery("DELETE FROM test WHERE value = 0", nil, status, 0, 1)
-	ts.mockDrv.AddQuery("DELETE FROM test", nil, status, 0, 0)
-	ts.mockDrv.AddQuery("DROP TABLE IF EXISTS test", nil, status, 0, 0)
-	runTestCRUD(c)
-
-	ts.mockDrv.AddQuery("use test", nil, status, 0, 0)
-	result = ts.mockDrv.BuildResult("..@@max_allowed_packet")
-	result.AddRow(16777216)
-	ts.mockDrv.AddQuery("SELECT @@max_allowed_packet", result, status, 0, 0)
-	ts.mockDrv.AddQuery("DROP TABLE IF EXISTS test", nil, status, 0, 0)
-
-	result = ts.mockDrv.BuildResult("..@@version_comment").AddRow(protocol.DefaultVariables["version_comment"].Value)
-	ts.mockDrv.AddQuery("select @@version_comment limit 1", result, status, 0, 0)
-	result = ts.mockDrv.BuildResult("..DATABASE()").AddRow("")
-	ts.mockDrv.AddQuery("SELECT DATABASE()", result, status, 0, 0)
-	ts.mockDrv.AddQuery("use test", nil, status, 0, 0)
-	ts.mockDrv.AddQuery("show databases", ts.mockDrv.BuildResult("..Database").AddRow("test"), status, 0, 0)
-	ts.mockDrv.AddQuery("show tables", ts.mockDrv.BuildResult("..Tables_in_test").AddRow("test"), status, 0, 0)
-	ts.mockDrv.AddQuery("DROP TABLE IF EXISTS test", nil, status, 0, 0)
-	runTestClientInitial(c)
-}
-
-var _ = Suite(newTestCRUDSuite())
-
-func TestCRUD(t *testing.T) {
+func TestT(t *testing.T) {
 	TestingT(t)
 }
 
@@ -121,7 +52,7 @@ func (dbt *DBTest) mustQuery(query string, args ...interface{}) (rows *sql.Rows)
 func runTestCRUD(c *C) {
 	runTests(c, "root@tcp(localhost:4000)/test", func(dbt *DBTest) {
 		// Create Table
-		dbt.mustExec("CREATE TABLE test (value BOOL)")
+		dbt.mustExec("CREATE TABLE test (val TINYINT)")
 
 		// Test for unexpected data
 		var out bool
@@ -132,63 +63,49 @@ func runTestCRUD(c *C) {
 		res := dbt.mustExec("INSERT INTO test VALUES (1)")
 		count, err := res.RowsAffected()
 		dbt.Assert(err, IsNil)
-		dbt.Assert(count, Equals, int64(1))
+		dbt.Check(count, Equals, int64(1))
 		id, err := res.LastInsertId()
 		dbt.Assert(err, IsNil)
-		dbt.Assert(id, Equals, int64(0))
+		dbt.Check(id, Equals, int64(0))
 
 		// Read
-		rows = dbt.mustQuery("SELECT value FROM test")
+		rows = dbt.mustQuery("SELECT val FROM test")
 		if rows.Next() {
 			rows.Scan(&out)
-			dbt.Assert(out, Equals, true)
-			dbt.Assert(rows.Next(), Equals, false, Commentf("unexpected data"))
+			dbt.Check(out, Equals, true)
+			dbt.Check(rows.Next(), Equals, false, Commentf("unexpected data"))
 		} else {
 			dbt.Error("no data")
 		}
 		rows.Close()
 
 		// Update
-		res = dbt.mustExec(interpolateParams("UPDATE test SET value = 0 WHERE value = ?", false, 1))
+		res = dbt.mustExec(interpolateParams("UPDATE test SET val = 0 WHERE val = ?", false, 1))
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
-		dbt.Assert(count, Equals, int64(1))
+		dbt.Check(count, Equals, int64(1))
 
 		// Check Update
-		rows = dbt.mustQuery("SELECT value FROM test")
+		rows = dbt.mustQuery("SELECT val FROM test")
 		if rows.Next() {
 			rows.Scan(&out)
-			dbt.Assert(out, Equals, false)
-			dbt.Assert(rows.Next(), Equals, false, Commentf("unexpected data"))
+			dbt.Check(out, Equals, false)
+			dbt.Check(rows.Next(), Equals, false, Commentf("unexpected data"))
 		} else {
 			dbt.Error("no data")
 		}
 		rows.Close()
 
 		// Delete
-		res = dbt.mustExec("DELETE FROM test WHERE value = 0")
+		res = dbt.mustExec("DELETE FROM test WHERE val = 0")
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
-		dbt.Assert(count, Equals, int64(1))
+		dbt.Check(count, Equals, int64(1))
 
 		// Check for unexpected rows
 		res = dbt.mustExec("DELETE FROM test")
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
-		dbt.Assert(count, Equals, int64(0))
-	})
-}
-
-func runTestClientInitial(c *C) {
-	runTests(c, "root@tcp(localhost:4000)/test", func(dbt *DBTest) {
-		rows := dbt.mustQuery("select @@version_comment limit 1")
-		dbt.Assert(rows.Next(), Equals, true)
-		rows.Close()
-		rows = dbt.mustQuery("SELECT DATABASE()")
-		dbt.Assert(rows.Next(), Equals, true)
-		rows.Close()
-		dbt.mustExec("use test")
-		dbt.mustQuery("show databases").Close()
-		dbt.mustQuery("show tables").Close()
+		dbt.Check(count, Equals, int64(0))
 	})
 }

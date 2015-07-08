@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/ngaut/log"
+	"github.com/pingcap/mp/etc"
 	"github.com/pingcap/mp/server"
 )
 
@@ -25,7 +26,7 @@ func main() {
 		return
 	}
 
-	cfg, err := server.ParseConfigFile(*configFile)
+	cfg, err := etc.ParseConfigFile(*configFile)
 	if err != nil {
 		log.Error(err.Error())
 		return
@@ -36,7 +37,7 @@ func main() {
 	log.CrashLog("./cm-proxy.dump")
 
 	var svr *server.Server
-	svr, err = server.NewServer(cfg, server.NewQlDriver())
+	svr, err = server.NewServer(cfg, &server.QlDriver{})
 	if err != nil {
 		log.Error(err.Error())
 		return
