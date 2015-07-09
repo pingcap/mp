@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	. "gopkg.in/check.v1"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func TestT(t *testing.T) {
