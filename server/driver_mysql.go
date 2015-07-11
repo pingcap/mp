@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/juju/errors"
-	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mp/protocol"
 )
