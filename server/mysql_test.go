@@ -3,9 +3,8 @@ package server
 import (
 	"time"
 
-	. "gopkg.in/check.v1"
-	"github.com/ngaut/log"
 	"github.com/pingcap/mp/etc"
+	. "gopkg.in/check.v1"
 )
 
 type MysqlTestSuite struct {
@@ -15,7 +14,7 @@ type MysqlTestSuite struct {
 
 var _ = Suite(&MysqlTestSuite{})
 
-func (ts *MysqlTestSuite) SetUpSuite(c *C){
+func (ts *MysqlTestSuite) SetUpSuite(c *C) {
 	ts.driver = &MysqlDriver{}
 	cfg := &etc.Config{
 		Addr:     ":4000",
@@ -24,9 +23,7 @@ func (ts *MysqlTestSuite) SetUpSuite(c *C){
 		LogLevel: "debug",
 	}
 	server, err := NewServer(cfg, ts.driver)
-	if err != nil {
-		log.Fatal(err)
-	}
+	c.Assert(err, IsNil)
 	ts.server = server
 	go ts.server.Run()
 	time.Sleep(time.Millisecond * 100)

@@ -3,7 +3,6 @@ package server
 import (
 	"time"
 
-	"github.com/ngaut/log"
 	"github.com/pingcap/mp/etc"
 	. "gopkg.in/check.v1"
 )
@@ -23,16 +22,12 @@ func (ts *QLTestSuite) SetUpSuite(c *C) {
 		Password: "",
 		LogLevel: "debug",
 	}
-	ctx, _ := ts.qldrv.OpenCtx()
+	ctx, _ := ts.qldrv.OpenCtx(DEFAULT_CAPABILITY, 33, "test")
 	_, err := ctx.Execute("CREATE DATABASE IF NOT EXISTS test")
-	if err != nil {
-		log.Fatal(err)
-	}
+	c.Assert(err, IsNil)
 	ctx.Close()
 	server, err := NewServer(cfg, ts.qldrv)
-	if err != nil {
-		log.Fatal(err)
-	}
+	c.Assert(err, IsNil)
 	ts.server = server
 	go ts.server.Run()
 	time.Sleep(time.Millisecond * 100)

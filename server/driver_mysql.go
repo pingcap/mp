@@ -3,23 +3,24 @@ package server
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"time"
 
+	"github.com/juju/errors"
+	"github.com/ngaut/log"
+	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mp/protocol"
 )
 
 type MysqlDriver struct{}
 
 type MysqlStatement struct {
-	mConn   *MysqlConn
-	id      int
-	sql     string
-	columns []*ColumnInfo
-	params  []*ColumnInfo
+	mConn       *MysqlConn
+	id          int
+	sql         string
+	boundParams [][]byte
 }
 
 type MysqlConn struct {
@@ -37,6 +38,7 @@ type MysqlConn struct {
 	status       uint16
 	lastInsertID uint64
 	affectedRows uint64
+	warningCount uint16
 
 	collation CollationId
 	charset   string
@@ -49,10 +51,12 @@ type MysqlConn struct {
 	stmts map[int]*MysqlStatement //statement id : parameters column info
 }
 
-func (md *MysqlDriver) OpenCtx() (ctx Context, err error) {
+func (md *MysqlDriver) OpenCtx(capability uint32, collation uint8, dbname string) (ctx IContext, err error) {
 	mc := new(MysqlConn)
 	mc.stmts = make(map[int]*MysqlStatement)
-	err = mc.Connect(":3306", "root", "", "test")
+	mc.capability = capability & (^CLIENT_PLUGIN_AUTH)
+	mc.collation = CollationId(collation)
+	err = mc.Connect(":3306", "root", "", dbname)
 	if err != nil {
 		return nil, err
 	}
@@ -61,15 +65,30 @@ func (md *MysqlDriver) OpenCtx() (ctx Context, err error) {
 }
 
 func (ms *MysqlStatement) Execute(args ...interface{}) (rs *ResultSet, err error) {
+	ms.Reset()
 	return ms.mConn.Execute(ms.sql, args...)
 }
 
-func (ms *MysqlStatement) Columns() []*ColumnInfo {
-	return ms.columns
+func (ms *MysqlStatement) AppendParam(paramId int, data []byte) (err error) {
+	if paramId >= len(ms.boundParams) {
+		return NewDefaultError(ER_WRONG_ARGUMENTS, "stmt_send_longdata")
+	}
+	ms.boundParams[paramId] = append(ms.boundParams[paramId], data...)
+	return
 }
 
-func (ms *MysqlStatement) Params() []*ColumnInfo {
-	return ms.params
+func (ms *MysqlStatement) BoundParams() [][]byte {
+	return ms.boundParams
+}
+
+func (ms *MysqlStatement) NumParams() int {
+	return len(ms.boundParams)
+}
+
+func (ms *MysqlStatement) Reset() {
+	for i := range ms.boundParams {
+		ms.boundParams[i] = nil
+	}
 }
 
 func (ms *MysqlStatement) ID() int {
@@ -77,11 +96,7 @@ func (ms *MysqlStatement) ID() int {
 }
 
 func (ms *MysqlStatement) Close() error {
-	err := ms.mConn.writeCommandBuf(byte(COM_STMT_CLOSE), Uint32ToBytes(uint32(ms.id)))
-	if err != nil {
-		return err
-	}
-	err = ms.mConn.readOK()
+	err := ms.mConn.writeCommandBuf(byte(COM_STMT_CLOSE), dumpUint32(uint32(ms.id)))
 	if err != nil {
 		return err
 	}
@@ -101,6 +116,10 @@ func (mc *MysqlConn) AffectedRows() uint64 {
 	return mc.affectedRows
 }
 
+func (mc *MysqlConn) WarningCount() uint16 {
+	return mc.warningCount
+}
+
 func (mc *MysqlConn) CurrentDB() string {
 	return mc.db
 }
@@ -110,11 +129,6 @@ func (mc *MysqlConn) Connect(addr string, user string, password string, db strin
 	mc.user = user
 	mc.password = password
 	mc.db = db
-
-	//use utf8
-	mc.collation = DEFAULT_COLLATION_ID
-	mc.charset = DEFAULT_CHARSET
-
 	return mc.ReConnect()
 }
 
@@ -199,21 +213,17 @@ func (mc *MysqlConn) readInitialHandshake() error {
 	//skip filter
 	pos += 8 + 1
 
-	//capability lower 2 bytes
-	mc.capability = uint32(binary.LittleEndian.Uint16(data[pos : pos+2]))
-
+	//server capability lower 2 bytes
 	pos += 2
 
 	if len(data) > pos {
-		//skip server charset
-		//c.charset = data[pos]
+		//skip server collation
 		pos += 1
 
 		mc.status = binary.LittleEndian.Uint16(data[pos : pos+2])
 		pos += 2
 
-		mc.capability = uint32(binary.LittleEndian.Uint16(data[pos:pos+2]))<<16 | mc.capability
-
+		//server capability upper 2 bytes
 		pos += 2
 
 		//skip auth data len or [00]
@@ -226,16 +236,10 @@ func (mc *MysqlConn) readInitialHandshake() error {
 		// which is not documented but seems to work.
 		mc.salt = append(mc.salt, data[pos:pos+12]...)
 	}
-
 	return nil
 }
 
 func (mc *MysqlConn) writeAuthHandshake() error {
-	// Adjust client capability flags based on server support
-	capability := CLIENT_PROTOCOL_41 | CLIENT_SECURE_CONNECTION |
-		CLIENT_LONG_PASSWORD | CLIENT_TRANSACTIONS | CLIENT_LONG_FLAG
-
-	capability &= mc.capability
 
 	//packet length
 	//capbility 4
@@ -248,25 +252,20 @@ func (mc *MysqlConn) writeAuthHandshake() error {
 	length += len(mc.user) + 1
 
 	//we only support secure connection
-	auth := CalcPassword(mc.salt, []byte(mc.password))
+	auth := calcPassword(mc.salt, []byte(mc.password))
 
 	length += 1 + len(auth)
-
 	if len(mc.db) > 0 {
-		capability |= CLIENT_CONNECT_WITH_DB
-
 		length += len(mc.db) + 1
 	}
-
-	mc.capability = capability
 
 	data := make([]byte, length+4)
 
 	//capability [32 bit]
-	data[4] = byte(capability)
-	data[5] = byte(capability >> 8)
-	data[6] = byte(capability >> 16)
-	data[7] = byte(capability >> 24)
+	data[4] = byte(mc.capability)
+	data[5] = byte(mc.capability >> 8)
+	data[6] = byte(mc.capability >> 16)
+	data[7] = byte(mc.capability >> 24)
 
 	//MaxPacketSize [32 bit] (none)
 	//data[8] = 0x00
@@ -274,7 +273,7 @@ func (mc *MysqlConn) writeAuthHandshake() error {
 	//data[10] = 0x00
 	//data[11] = 0x00
 
-	//Charset [1 byte]
+	//Collation [1 byte]
 	data[12] = byte(mc.collation)
 
 	//Filler [23 bytes] (all 0x00)
@@ -300,33 +299,7 @@ func (mc *MysqlConn) writeAuthHandshake() error {
 	return mc.writePacket(data)
 }
 
-func (mc *MysqlConn) writeCommand(command byte) error {
-	mc.pkg.Sequence = 0
-
-	return mc.writePacket([]byte{
-		0x01, //1 bytes long
-		0x00,
-		0x00,
-		0x00, //sequence
-		command,
-	})
-}
-
 func (mc *MysqlConn) writeCommandBuf(command byte, arg []byte) error {
-	mc.pkg.Sequence = 0
-
-	length := len(arg) + 1
-
-	data := make([]byte, length+4)
-
-	data[4] = command
-
-	copy(data[5:], arg)
-
-	return mc.writePacket(data)
-}
-
-func (mc *MysqlConn) writeCommandStr(command byte, arg string) error {
 	mc.pkg.Sequence = 0
 
 	length := len(arg) + 1
@@ -376,7 +349,7 @@ func (mc *MysqlConn) UseDB(dbName string) error {
 		return nil
 	}
 
-	if err := mc.writeCommandStr(byte(COM_INIT_DB), dbName); err != nil {
+	if err := mc.writeCommandBuf(byte(COM_INIT_DB), hack.Slice(dbName)); err != nil {
 		return err
 	}
 
@@ -468,8 +441,8 @@ func (mc *MysqlConn) FieldList(table string, wildcard string) ([]*ColumnInfo, er
 }
 
 func (mc *MysqlConn) exec(query string) (*ResultSet, error) {
-	if err := mc.writeCommandStr(byte(COM_QUERY), query); err != nil {
-		return nil, err
+	if err := mc.writeCommandBuf(byte(COM_QUERY), hack.Slice(query)); err != nil {
+		return nil, errors.Trace(err)
 	}
 
 	return mc.readResult(false)
@@ -479,7 +452,7 @@ func (mc *MysqlConn) readResultSet(data []byte, binary bool) (*ResultSet, error)
 	result := &ResultSet{}
 
 	// column count
-	count, _, n := LengthEncodedInt(data)
+	count, _, n := parseLengthEncodedInt(data)
 
 	if n-len(data) != 0 {
 		return nil, ErrMalformPacket
@@ -487,11 +460,11 @@ func (mc *MysqlConn) readResultSet(data []byte, binary bool) (*ResultSet, error)
 	var err error
 	result.Columns, err = mc.readColumns(int(count))
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	if err := mc.readResultRows(result, binary); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	return result, nil
@@ -505,6 +478,7 @@ func (mc *MysqlConn) readColumns(count int) (columns []*ColumnInfo, err error) {
 	for {
 		data, err = mc.readPacket()
 		if err != nil {
+			err = errors.Trace(err)
 			return
 		}
 
@@ -517,7 +491,7 @@ func (mc *MysqlConn) readColumns(count int) (columns []*ColumnInfo, err error) {
 			}
 
 			if i != count {
-				err = ErrMalformPacket
+				err = errors.Trace(ErrMalformPacket)
 			}
 
 			return
@@ -525,6 +499,7 @@ func (mc *MysqlConn) readColumns(count int) (columns []*ColumnInfo, err error) {
 
 		columns[i], err = ParseColumnInfo(data)
 		if err != nil {
+			err = errors.Trace(err)
 			return
 		}
 
@@ -539,6 +514,7 @@ func (mc *MysqlConn) readResultRows(result *ResultSet, isBinary bool) (err error
 		data, err = mc.readPacket()
 
 		if err != nil {
+			err = errors.Trace(err)
 			return
 		}
 
@@ -560,13 +536,13 @@ func (mc *MysqlConn) readResultRows(result *ResultSet, isBinary bool) (err error
 
 	for i, rowData := range rowDatas {
 		if isBinary {
-			result.Rows[i], err = ParseRowValuesBinary(result.Columns, rowData)
+			result.Rows[i], err = parseRowValuesBinary(result.Columns, rowData)
 		} else {
-			result.Rows[i], err = ParseRowValuesText(result.Columns, rowData)
+			result.Rows[i], err = parseRowValuesText(result.Columns, rowData)
 		}
 
 		if err != nil {
-			return err
+			return errors.Trace(err)
 		}
 	}
 
@@ -595,13 +571,13 @@ func (mc *MysqlConn) isEOFPacket(data []byte) bool {
 	return data[0] == EOF_HEADER && len(data) <= 5
 }
 
-func (mc *MysqlConn) handleOKPacket(data []byte) error {
+func (mc *MysqlConn) handleOKPacket(data []byte) (err error) {
 	var n int
 	var pos int = 1
 
-	mc.affectedRows, _, n = LengthEncodedInt(data[pos:])
+	mc.affectedRows, _, n = parseLengthEncodedInt(data[pos:])
 	pos += n
-	mc.lastInsertID, _, n = LengthEncodedInt(data[pos:])
+	mc.lastInsertID, _, n = parseLengthEncodedInt(data[pos:])
 	pos += n
 
 	if mc.capability&CLIENT_PROTOCOL_41 > 0 {
@@ -609,15 +585,14 @@ func (mc *MysqlConn) handleOKPacket(data []byte) error {
 		pos += 2
 
 		//todo:strict_mode, check warnings as error
-		//Warnings := binary.LittleEndian.Uint16(data[pos:])
-		//pos += 2
+		mc.warningCount = binary.LittleEndian.Uint16(data[pos:])
+		pos += 2
 	} else if mc.capability&CLIENT_TRANSACTIONS > 0 {
 		mc.status = binary.LittleEndian.Uint16(data[pos:])
 		pos += 2
 	}
-
 	//info
-	return nil
+	return
 }
 
 func (mc *MysqlConn) handleErrorPacket(data []byte) error {
@@ -684,24 +659,30 @@ func (mc *MysqlConn) GetCharset() string {
 	return mc.charset
 }
 
-func (mc *MysqlConn) Prepare(query string) (stmt Statement, err error) {
-	if err := mc.writeCommandStr(byte(COM_STMT_PREPARE), query); err != nil {
-		return nil, err
+func (mc *MysqlConn) Prepare(query string) (stmt IStatement, columns, params []*ColumnInfo, err error) {
+	if err = mc.writeCommandBuf(byte(COM_STMT_PREPARE), hack.Slice(query)); err != nil {
+		return
 	}
 
-	data, err := mc.readPacket()
+	var data []byte
+	data, err = mc.readPacket()
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	if data[0] == ERR_HEADER {
-		return nil, mc.handleErrorPacket(data)
+		err = mc.handleErrorPacket(data)
+		return
 	} else if data[0] != OK_HEADER {
-		return nil, ErrMalformPacket
+		err = ErrMalformPacket
+		return
 	}
 
 	pos := 1
 	mStmt := new(MysqlStatement)
+
+	mStmt.mConn = mc
+	mStmt.sql = query
 
 	//for statement id
 	mStmt.id = int(binary.LittleEndian.Uint32(data[pos:]))
@@ -715,18 +696,19 @@ func (mc *MysqlConn) Prepare(query string) (stmt Statement, err error) {
 	numParams := int(binary.LittleEndian.Uint16(data[pos:]))
 	pos += 2
 
+	mStmt.boundParams = make([][]byte, numParams)
 	//warnings
 	//warnings = binary.LittleEndian.Uint16(data[pos:])
 
 	if numParams > 0 {
-		mStmt.params, err = mc.readColumns(numParams)
+		params, err = mc.readColumns(numParams)
 		if err != nil {
 			return
 		}
 	}
 
 	if numColumns > 0 {
-		mStmt.columns, err = mc.readColumns(numColumns)
+		columns, err = mc.readColumns(numColumns)
 		if err != nil {
 			return
 		}
@@ -736,11 +718,7 @@ func (mc *MysqlConn) Prepare(query string) (stmt Statement, err error) {
 	return
 }
 
-func (mc *MysqlConn) CloseStmt(stmtId int) (err error) {
-	return
-}
-
-func (mc *MysqlConn) GetStatement(stmtId int) Statement {
+func (mc *MysqlConn) GetStatement(stmtId int) IStatement {
 	return mc.stmts[stmtId]
 }
 

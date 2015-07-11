@@ -5,26 +5,29 @@ import (
 )
 
 type IDriver interface {
-	OpenCtx() (Context, error)
+	OpenCtx(capability uint32, collation uint8, dbname string) (IContext, error)
 }
 
-type Context interface {
+type IContext interface {
 	Status() uint16
 	LastInsertID() uint64
 	AffectedRows() uint64
 	CurrentDB() string
+	WarningCount() uint16
 	Execute(sql string, args ...interface{}) (*ResultSet, error)
-	Prepare(sql string) (statement Statement, err error)
-	GetStatement(stmtId int) Statement
+	Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error)
+	GetStatement(stmtId int) IStatement
 	FieldList(tableName, wildCard string) (columns []*ColumnInfo, err error)
 	Close() error
 }
 
-type Statement interface {
+type IStatement interface {
 	ID() int
 	Execute(args ...interface{}) (*ResultSet, error)
-	Columns() []*ColumnInfo
-	Params() []*ColumnInfo
+	AppendParam(paramId int, data []byte) error
+	NumParams() int
+	BoundParams() [][]byte
+	Reset()
 	Close() error
 }
 

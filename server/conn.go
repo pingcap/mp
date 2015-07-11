@@ -8,6 +8,7 @@ import (
 	"net"
 	"runtime"
 
+	"crypto/sha1"
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
 	"github.com/ngaut/log"
@@ -17,7 +18,7 @@ import (
 
 var DEFAULT_CAPABILITY uint32 = protocol.CLIENT_LONG_PASSWORD | protocol.CLIENT_LONG_FLAG |
 	protocol.CLIENT_CONNECT_WITH_DB | protocol.CLIENT_PROTOCOL_41 |
-	protocol.CLIENT_TRANSACTIONS | protocol.CLIENT_SECURE_CONNECTION
+	protocol.CLIENT_TRANSACTIONS | protocol.CLIENT_SECURE_CONNECTION | protocol.CLIENT_FOUND_ROWS
 
 type ClientConn struct {
 	pkg          *PacketIO
@@ -28,10 +29,11 @@ type ClientConn struct {
 	collation    protocol.CollationId
 	charset      string
 	user         string
+	dbname       string
 	salt         []byte
 	alloc        arena.ArenaAllocator
 	lastCmd      string
-	ctx          Context
+	ctx          IContext
 }
 
 func (cc *ClientConn) String() string {
@@ -48,10 +50,21 @@ func (cc *ClientConn) Handshake() error {
 		cc.writeError(err)
 		return errors.Trace(err)
 	}
-	err := cc.writeOK()
-	cc.pkg.Sequence = 0
+	data := cc.alloc.AllocBytesWithLen(4, 32)
+	data = append(data, protocol.OK_HEADER)
+	data = append(data, 0, 0)
+	if cc.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, dumpUint16(protocol.SERVER_STATUS_AUTOCOMMIT)...)
+		data = append(data, 0, 0)
+	}
 
-	return err
+	err := cc.writePacket(data)
+	cc.pkg.Sequence = 0
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	return errors.Trace(cc.flush())
 }
 
 func (cc *ClientConn) Close() error {
@@ -78,7 +91,7 @@ func (cc *ClientConn) writeInitialHandshake() error {
 	//charset, utf-8 default
 	data = append(data, uint8(protocol.DEFAULT_COLLATION_ID))
 	//status
-	data = append(data, byte(cc.ctx.Status()), byte(cc.ctx.Status()>>8))
+	data = append(data, dumpUint16(protocol.SERVER_STATUS_AUTOCOMMIT)...)
 	//below 13 byte may not be used
 	//capability flag upper 2 bytes, using default capability here
 	data = append(data, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
@@ -103,6 +116,35 @@ func (cc *ClientConn) readPacket() ([]byte, error) {
 
 func (cc *ClientConn) writePacket(data []byte) error {
 	return cc.pkg.WritePacket(data)
+}
+
+func calcPassword(scramble, password []byte) []byte {
+	if len(password) == 0 {
+		return nil
+	}
+
+	// stage1Hash = SHA1(password)
+	crypt := sha1.New()
+	crypt.Write(password)
+	stage1 := crypt.Sum(nil)
+
+	// scrambleHash = SHA1(scramble + SHA1(stage1Hash))
+	// inner Hash
+	crypt.Reset()
+	crypt.Write(stage1)
+	hash := crypt.Sum(nil)
+
+	// outer Hash
+	crypt.Reset()
+	crypt.Write(scramble)
+	crypt.Write(hash)
+	scramble = crypt.Sum(nil)
+
+	// token = scrambleHash XOR stage1Hash
+	for i := range scramble {
+		scramble[i] ^= stage1[i]
+	}
+	return scramble
 }
 
 func (cc *ClientConn) readHandshakeResponse() error {
@@ -130,7 +172,7 @@ func (cc *ClientConn) readHandshakeResponse() error {
 	authLen := int(data[pos])
 	pos++
 	auth := data[pos : pos+authLen]
-	checkAuth := CalcPassword(cc.salt, []byte(cc.server.CfgGetPwd(cc.user)))
+	checkAuth := calcPassword(cc.salt, []byte(cc.server.CfgGetPwd(cc.user)))
 	if !bytes.Equal(auth, checkAuth) && !cc.server.SkipAuth() {
 		return errors.Trace(protocol.NewDefaultError(protocol.ER_ACCESS_DENIED_ERROR, cc.conn.RemoteAddr().String(), cc.user, "Yes"))
 	}
@@ -141,10 +183,7 @@ func (cc *ClientConn) readHandshakeResponse() error {
 			return nil
 		}
 
-		db := string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
-		if err := cc.useDB(db); err != nil {
-			return errors.Trace(err)
-		}
+		cc.dbname = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
 	}
 
 	return nil
@@ -189,7 +228,11 @@ func (cc *ClientConn) Run() {
 func (cc *ClientConn) dispatch(data []byte) error {
 	cmd := data[0]
 	data = data[1:]
-	log.Debug(cc.connectionId, cmd, string(data))
+	if len(data) > 256 {
+		log.Debug(cc.connectionId, cmd, string(data[:256])+"...")
+	} else {
+		log.Debug(cc.connectionId, cmd, string(data))
+	}
 	cc.lastCmd = hack.String(data)
 
 	token := cc.server.GetToken()
@@ -212,7 +255,7 @@ func (cc *ClientConn) dispatch(data []byte) error {
 	case protocol.COM_PING:
 		return cc.writeOK()
 	case protocol.COM_INIT_DB:
-		log.Debug(cmd, hack.String(data))
+		log.Debug("init db", hack.String(data))
 		if err := cc.useDB(hack.String(data)); err != nil {
 			return errors.Trace(err)
 		}
@@ -250,11 +293,11 @@ func (cc *ClientConn) flush() error {
 func (cc *ClientConn) writeOK() error {
 	data := cc.alloc.AllocBytesWithLen(4, 32)
 	data = append(data, protocol.OK_HEADER)
-	data = append(data, PutLengthEncodedInt(uint64(cc.ctx.AffectedRows()))...)
-	data = append(data, PutLengthEncodedInt(uint64(cc.ctx.LastInsertID()))...)
+	data = append(data, dumpLengthEncodedInt(uint64(cc.ctx.AffectedRows()))...)
+	data = append(data, dumpLengthEncodedInt(uint64(cc.ctx.LastInsertID()))...)
 	if cc.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
-		data = append(data, byte(cc.ctx.Status()), byte(cc.ctx.Status()>>8))
-		data = append(data, 0, 0)
+		data = append(data, dumpUint16(cc.ctx.Status())...)
+		data = append(data, dumpUint16(cc.ctx.WarningCount())...)
 	}
 
 	err := cc.writePacket(data)
@@ -289,13 +332,13 @@ func (cc *ClientConn) writeError(e error) error {
 	return errors.Trace(cc.flush())
 }
 
-func (cc *ClientConn) writeEOF(status uint16) error {
+func (cc *ClientConn) writeEOF() error {
 	data := cc.alloc.AllocBytesWithLen(4, 9)
 
 	data = append(data, protocol.EOF_HEADER)
 	if cc.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
-		data = append(data, 0, 0)
-		data = append(data, byte(status), byte(status>>8))
+		data = append(data, dumpUint16(cc.ctx.WarningCount())...)
+		data = append(data, dumpUint16(cc.ctx.Status())...)
 	}
 
 	err := cc.writePacket(data)
@@ -305,7 +348,7 @@ func (cc *ClientConn) writeEOF(status uint16) error {
 func (cc *ClientConn) handleQuery(sql string) (err error) {
 	rs, err := cc.ctx.Execute(sql)
 	if err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	if rs != nil {
 		cc.writeResultset(rs, false)
@@ -315,25 +358,75 @@ func (cc *ClientConn) handleQuery(sql string) (err error) {
 	return
 }
 
-func (cc *ClientConn) writeFieldList(status uint16, fs []*ColumnInfo) error {
+func (cc *ClientConn) handleFieldList(sql string) (err error) {
+	columns, err := cc.ctx.FieldList(sql, "")
+	if err != nil {
+		return
+	}
 	data := make([]byte, 4, 1024)
-	for _, v := range fs {
+	for _, v := range columns {
 		data = data[0:4]
 		data = append(data, v.Dump(cc.alloc)...)
 		if err := cc.writePacket(data); err != nil {
 			return err
 		}
 	}
-	if err := cc.writeEOF(cc.ctx.Status()); err != nil {
+	if err := cc.writeEOF(); err != nil {
 		return err
 	}
 	return errors.Trace(cc.flush())
 }
 
-func (cc *ClientConn) handleFieldList(sql string) (err error) {
-	columns, err := cc.ctx.FieldList(sql, "")
-	if err != nil {
-		return
+func (cc *ClientConn) writeResultset(rs *ResultSet, binary bool) error {
+	columnLen := dumpLengthEncodedInt(uint64(len(rs.Columns)))
+	data := cc.alloc.AllocBytesWithLen(4, 1024)
+	data = append(data, columnLen...)
+	if err := cc.writePacket(data); err != nil {
+		return errors.Trace(err)
 	}
-	return cc.writeFieldList(cc.ctx.Status(), columns)
+
+	for _, v := range rs.Columns {
+		data = data[0:4]
+		data = append(data, v.Dump(cc.alloc)...)
+		if err := cc.writePacket(data); err != nil {
+			return errors.Trace(err)
+		}
+	}
+
+	if err := cc.writeEOF(); err != nil {
+		return errors.Trace(err)
+	}
+	for _, row := range rs.Rows {
+		data = data[0:4]
+		if binary {
+			rowData, err := dumpRowValuesBinary(cc.alloc, rs.Columns, row)
+			if err != nil {
+				return errors.Trace(err)
+			}
+			data = append(data, rowData...)
+		} else {
+			for i, value := range row {
+				if value == nil {
+					data = append(data, 0xfb)
+					continue
+				}
+				valData, err := dumpTextValue(rs.Columns[i].Type, value)
+				if err != nil {
+					return errors.Trace(err)
+				}
+				data = append(data, dumpLengthEncodedString(valData, cc.alloc)...)
+			}
+		}
+
+		if err := cc.writePacket(data); err != nil {
+			return errors.Trace(err)
+		}
+	}
+
+	err := cc.writeEOF()
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	return errors.Trace(cc.flush())
 }

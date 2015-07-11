@@ -3,38 +3,53 @@ package server
 import (
 	. "github.com/pingcap/mp/protocol"
 	"github.com/pingcap/ql"
+	"github.com/pingcap/ql/field"
 )
 
 type QlDriver struct{}
 
 type QlContext struct {
-	sessionCtx ql.SessionCtx
-	currentDB  string
+	session      ql.Session
+	currentDB    string
+	warningCount uint16
 }
 
-func (qd *QlDriver) OpenCtx() (Context, error) {
-	qctx, _ := ql.CreateSessionCtx()
-	return &QlContext{qctx, ""}, nil
+type QlStatment struct {
+}
+
+func (qd *QlDriver) OpenCtx(capability uint32, collation uint8, dbname string) (IContext, error) {
+	session, _ := ql.CreateSession()
+	if dbname != "" {
+		_, err := session.Execute("use " + dbname)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &QlContext{session, "", 0}, nil
 }
 
 func (qc *QlContext) Status() uint16 {
-	return qc.sessionCtx.Status()
+	return qc.session.Status()
 }
 
 func (qc *QlContext) LastInsertID() uint64 {
-	return qc.sessionCtx.LastInsertID()
+	return qc.session.LastInsertID()
 }
 
 func (qc *QlContext) AffectedRows() uint64 {
-	return qc.sessionCtx.AffectedRows()
+	return qc.session.AffectedRows()
 }
 
 func (qc *QlContext) CurrentDB() string {
 	return qc.currentDB
 }
 
+func (qc *QlContext) WarningCount() uint16 {
+	return qc.warningCount
+}
+
 func (qc *QlContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
-	qrsList, err := qc.sessionCtx.Execute(sql, args...)
+	qrsList, err := qc.session.Execute(sql, args...)
 	if err != nil {
 		return
 	}
@@ -71,12 +86,12 @@ func (qc *QlContext) FieldList(table, wildCard string) (colums []*ColumnInfo, er
 	return
 }
 
-func (qc *QlContext) GetStatement(stmtId int) Statement {
+func (qc *QlContext) GetStatement(stmtId int) IStatement {
 	//TODO
 	return nil
 }
 
-func (qc *QlContext) Prepare(sql string) (statement Statement, err error) {
+func (qc *QlContext) Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error) {
 	//TODO
 	return
 }
@@ -100,7 +115,7 @@ var qlTypeMap = map[string]byte{
 	"uint8":    MYSQL_TYPE_TINY,
 }
 
-func convertColumnInfo(qlfield *ql.ResultField) (ci *ColumnInfo) {
+func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	ci = new(ColumnInfo)
 	ci.Schema = qlfield.DBName
 	ci.Flag = uint16(qlfield.Flag)

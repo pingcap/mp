@@ -6,54 +6,49 @@ import (
 	"strings"
 
 	"fmt"
+	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mp/protocol"
 	"math"
+	"reflect"
 )
 
-func (c *ClientConn) handleStmtPrepare(sql string) (err error) {
+func (cc *ClientConn) handleStmtPrepare(sql string) error {
 
-	stmt, err := c.ctx.Prepare(sql)
+	stmt, columns, params, err := cc.ctx.Prepare(sql)
 	if err != nil {
 		return err
 	}
-	return c.writePrepare(stmt)
-}
-
-func (c *ClientConn) writePrepare(stmt Statement) error {
 	data := make([]byte, 4, 128)
-
-	columns := stmt.Columns()
-	params := stmt.Params()
 
 	//status ok
 	data = append(data, 0)
 	//stmt id
-	data = append(data, Uint32ToBytes(uint32(stmt.ID()))...)
+	data = append(data, dumpUint32(uint32(stmt.ID()))...)
 	//number columns
-	data = append(data, Uint16ToBytes(uint16(len(columns)))...)
+	data = append(data, dumpUint16(uint16(len(columns)))...)
 	//number params
-	data = append(data, Uint16ToBytes(uint16(len(params)))...)
+	data = append(data, dumpUint16(uint16(len(params)))...)
 	//filter [00]
 	data = append(data, 0)
 	//warning count
 	data = append(data, 0, 0)
 
-	if err := c.writePacket(data); err != nil {
+	if err := cc.writePacket(data); err != nil {
 		return err
 	}
 
 	if len(params) > 0 {
 		for i := 0; i < len(params); i++ {
 			data = data[0:4]
-			data = append(data, params[i].Dump(c.alloc)...)
+			data = append(data, params[i].Dump(cc.alloc)...)
 
-			if err := c.writePacket(data); err != nil {
+			if err := cc.writePacket(data); err != nil {
 				return err
 			}
 		}
 
-		if err := c.writeEOF(c.ctx.Status()); err != nil {
+		if err := cc.writeEOF(); err != nil {
 			return err
 		}
 	}
@@ -61,22 +56,22 @@ func (c *ClientConn) writePrepare(stmt Statement) error {
 	if len(columns) > 0 {
 		for i := 0; i < len(columns); i++ {
 			data = data[0:4]
-			data = append(data, columns[i].Dump(c.alloc)...)
+			data = append(data, columns[i].Dump(cc.alloc)...)
 
-			if err := c.writePacket(data); err != nil {
+			if err := cc.writePacket(data); err != nil {
 				return err
 			}
 		}
 
-		if err := c.writeEOF(c.ctx.Status()); err != nil {
+		if err := cc.writeEOF(); err != nil {
 			return err
 		}
 
 	}
-	return c.flush()
+	return cc.flush()
 }
 
-func (c *ClientConn) handleStmtExecute(data []byte) (err error) {
+func (cc *ClientConn) handleStmtExecute(data []byte) (err error) {
 	if len(data) < 9 {
 		return ErrMalformPacket
 	}
@@ -85,7 +80,7 @@ func (c *ClientConn) handleStmtExecute(data []byte) (err error) {
 	stmtId := binary.LittleEndian.Uint32(data[0:4])
 	pos += 4
 
-	stmt := c.ctx.GetStatement(int(stmtId))
+	stmt := cc.ctx.GetStatement(int(stmtId))
 	if stmt == nil {
 		return NewDefaultError(ER_UNKNOWN_STMT_HANDLER,
 			strconv.FormatUint(uint64(stmtId), 10), "stmt_execute")
@@ -105,8 +100,8 @@ func (c *ClientConn) handleStmtExecute(data []byte) (err error) {
 	var paramTypes []byte
 	var paramValues []byte
 
-	numParams := len(stmt.Params())
-	var args []interface{}
+	numParams := stmt.NumParams()
+	args := make([]interface{}, numParams)
 	if numParams > 0 {
 		nullBitmapLen := (numParams + 7) >> 3
 		if len(data) < (pos + nullBitmapLen + 1) {
@@ -128,31 +123,36 @@ func (c *ClientConn) handleStmtExecute(data []byte) (err error) {
 			paramValues = data[pos:]
 		}
 
-		args, err = c.parseStmtArgs(numParams, nullBitmaps, paramTypes, paramValues)
+		err = parseStmtArgs(args, stmt.BoundParams(), nullBitmaps, paramTypes, paramValues)
 		if err != nil {
 			return err
 		}
 	}
-
 	rs, err := stmt.Execute(args...)
 	if err != nil {
 		return err
 	}
-	return c.writeResultset(rs, true)
+	if rs == nil {
+		return cc.writeOK()
+	}
+
+	return cc.writeResultset(rs, true)
 }
 
-func (c *ClientConn) parseStmtArgs(numParams int, nullBitmap, paramTypes, paramValues []byte) (args []interface{}, err error) {
-	args = make([]interface{}, numParams)
-
+func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTypes, paramValues []byte) (err error) {
 	pos := 0
 
 	var v []byte
 	var n int = 0
 	var isNull bool
 
-	for i := 0; i < numParams; i++ {
+	for i := 0; i < len(args); i++ {
 		if nullBitmap[i>>3]&(1<<(uint(i)%8)) > 0 {
 			args[i] = nil
+			continue
+		}
+		if boundParams[i] != nil {
+			args[i] = boundParams[i]
 			continue
 		}
 
@@ -171,9 +171,9 @@ func (c *ClientConn) parseStmtArgs(numParams int, nullBitmap, paramTypes, paramV
 			}
 
 			if isUnsigned {
-				args[i] = uint8(paramValues[pos])
+				args[i] = uint64(paramValues[pos])
 			} else {
-				args[i] = int8(paramValues[pos])
+				args[i] = int64(paramValues[pos])
 			}
 
 			pos++
@@ -186,9 +186,9 @@ func (c *ClientConn) parseStmtArgs(numParams int, nullBitmap, paramTypes, paramV
 			}
 
 			if isUnsigned {
-				args[i] = uint16(binary.LittleEndian.Uint16(paramValues[pos : pos+2]))
+				args[i] = uint64(binary.LittleEndian.Uint16(paramValues[pos : pos+2]))
 			} else {
-				args[i] = int16((binary.LittleEndian.Uint16(paramValues[pos : pos+2])))
+				args[i] = int64((binary.LittleEndian.Uint16(paramValues[pos : pos+2])))
 			}
 			pos += 2
 			continue
@@ -200,9 +200,9 @@ func (c *ClientConn) parseStmtArgs(numParams int, nullBitmap, paramTypes, paramV
 			}
 
 			if isUnsigned {
-				args[i] = uint32(binary.LittleEndian.Uint32(paramValues[pos : pos+4]))
+				args[i] = uint64(binary.LittleEndian.Uint32(paramValues[pos : pos+4]))
 			} else {
-				args[i] = int32(binary.LittleEndian.Uint32(paramValues[pos : pos+4]))
+				args[i] = int64(binary.LittleEndian.Uint32(paramValues[pos : pos+4]))
 			}
 			pos += 4
 			continue
@@ -227,7 +227,7 @@ func (c *ClientConn) parseStmtArgs(numParams int, nullBitmap, paramTypes, paramV
 				return
 			}
 
-			args[i] = float32(math.Float32frombits(binary.LittleEndian.Uint32(paramValues[pos : pos+4])))
+			args[i] = float64(math.Float32frombits(binary.LittleEndian.Uint32(paramValues[pos : pos+4])))
 			pos += 4
 			continue
 
@@ -252,7 +252,7 @@ func (c *ClientConn) parseStmtArgs(numParams int, nullBitmap, paramTypes, paramV
 				return
 			}
 
-			v, isNull, n, err = LengthEncodedBytes(paramValues[pos:])
+			v, isNull, n, err = parseLengthEncodedBytes(paramValues[pos:])
 			pos += n
 			if err != nil {
 				return
@@ -273,16 +273,49 @@ func (c *ClientConn) parseStmtArgs(numParams int, nullBitmap, paramTypes, paramV
 	return
 }
 
-func (c *ClientConn) handleStmtClose(data []byte) (err error) {
-	return c.writeError(nil)
+func (cc *ClientConn) handleStmtClose(data []byte) (err error) {
+	if len(data) < 4 {
+		return
+	}
+
+	stmtId := int(binary.LittleEndian.Uint32(data[0:4]))
+	stmt := cc.ctx.GetStatement(stmtId)
+	if stmt != nil {
+		stmt.Close()
+	}
+	return
 }
 
-func (c *ClientConn) handleStmtSendLongData(data []byte) (err error) {
-	return c.writeError(nil)
+func (cc *ClientConn) handleStmtSendLongData(data []byte) (err error) {
+	if len(data) < 6 {
+		return ErrMalformPacket
+	}
+
+	stmtId := int(binary.LittleEndian.Uint32(data[0:4]))
+
+	stmt := cc.ctx.GetStatement(stmtId)
+	if stmt == nil {
+		return NewDefaultError(ER_UNKNOWN_STMT_HANDLER,
+			strconv.Itoa(stmtId), "stmt_send_longdata")
+	}
+
+	paramId := int(binary.LittleEndian.Uint16(data[4:6]))
+	return stmt.AppendParam(paramId, data[6:])
 }
 
-func (c *ClientConn) handleStmtReset(data []byte) (err error) {
-	return c.writeError(nil)
+func (cc *ClientConn) handleStmtReset(data []byte) (err error) {
+	if len(data) < 4 {
+		return ErrMalformPacket
+	}
+
+	stmtId := int(binary.LittleEndian.Uint32(data[0:4]))
+	stmt := cc.ctx.GetStatement(stmtId)
+	if stmt == nil {
+		return NewDefaultError(ER_UNKNOWN_STMT_HANDLER,
+			strconv.Itoa(stmtId), "stmt_reset")
+	}
+	stmt.Reset()
+	return cc.writeOK()
 }
 
 // reserveBuffer checks cap(buf) and expand buffer to len(buf) + appendSize.
@@ -391,8 +424,12 @@ func interpolateParams(query string, noBackslashEscapes bool, args ...interface{
 		}
 
 		switch v := arg.(type) {
+		case uint:
+			buf = strconv.AppendUint(buf, uint64(v), 10)
 		case int:
 			buf = strconv.AppendInt(buf, int64(v), 10)
+		case uint64:
+			buf = strconv.AppendUint(buf, v, 10)
 		case int64:
 			buf = strconv.AppendInt(buf, v, 10)
 		case float64:
@@ -405,7 +442,7 @@ func interpolateParams(query string, noBackslashEscapes bool, args ...interface{
 			}
 		case []byte:
 			if v == nil {
-				buf = append(buf, "NULL"...)
+				buf = append(buf, "''"...) //empty string
 			} else {
 				buf = append(buf, '\'')
 				if noBackslashEscapes {
@@ -424,6 +461,7 @@ func interpolateParams(query string, noBackslashEscapes bool, args ...interface{
 			}
 			buf = append(buf, '\'')
 		default:
+			log.Debug("unkonw type", reflect.TypeOf(arg))
 			return ""
 		}
 	}

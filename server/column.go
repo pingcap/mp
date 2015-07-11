@@ -28,42 +28,42 @@ func ParseColumnInfo(data []byte) (col *ColumnInfo, err error) {
 	var n int
 	pos := 0
 	//skip catelog, always def
-	n, err = SkipLengthEnodedString(data)
+	n, err = skipLengthEnodedString(data)
 	if err != nil {
 		return
 	}
 	pos += n
 
 	//schema
-	col.Schema, _, n, err = LengthEncodedString(data[pos:])
+	col.Schema, _, n, err = parseLengthEncodedString(data[pos:])
 	if err != nil {
 		return
 	}
 	pos += n
 
 	//table
-	col.Table, _, n, err = LengthEncodedString(data[pos:])
+	col.Table, _, n, err = parseLengthEncodedString(data[pos:])
 	if err != nil {
 		return
 	}
 	pos += n
 
 	//org_table
-	col.OrgTable, _, n, err = LengthEncodedString(data[pos:])
+	col.OrgTable, _, n, err = parseLengthEncodedString(data[pos:])
 	if err != nil {
 		return
 	}
 	pos += n
 
 	//name
-	col.Name, _, n, err = LengthEncodedString(data[pos:])
+	col.Name, _, n, err = parseLengthEncodedString(data[pos:])
 	if err != nil {
 		return
 	}
 	pos += n
 
 	//org_name
-	col.OrgName, _, n, err = LengthEncodedString(data[pos:])
+	col.OrgName, _, n, err = parseLengthEncodedString(data[pos:])
 	if err != nil {
 		return
 	}
@@ -99,7 +99,7 @@ func ParseColumnInfo(data []byte) (col *ColumnInfo, err error) {
 	//if more data, command was field list
 	if len(data) > pos {
 		//length of default value lenenc-int
-		col.DefaultValueLength, _, n = LengthEncodedInt(data[pos:])
+		col.DefaultValueLength, _, n = parseLengthEncodedInt(data[pos:])
 		pos += n
 
 		if pos+int(col.DefaultValueLength) > len(data) {
@@ -118,27 +118,27 @@ func (column *ColumnInfo) Dump(alloc arena.ArenaAllocator) []byte {
 
 	data := make([]byte, 0, l)
 
-	data = append(data, PutLengthEncodedString([]byte("def"), alloc)...)
+	data = append(data, dumpLengthEncodedString([]byte("def"), alloc)...)
 
-	data = append(data, PutLengthEncodedString([]byte(column.Schema), alloc)...)
+	data = append(data, dumpLengthEncodedString([]byte(column.Schema), alloc)...)
 
-	data = append(data, PutLengthEncodedString([]byte(column.Table), alloc)...)
-	data = append(data, PutLengthEncodedString([]byte(column.OrgTable), alloc)...)
+	data = append(data, dumpLengthEncodedString([]byte(column.Table), alloc)...)
+	data = append(data, dumpLengthEncodedString([]byte(column.OrgTable), alloc)...)
 
-	data = append(data, PutLengthEncodedString([]byte(column.Name), alloc)...)
-	data = append(data, PutLengthEncodedString([]byte(column.OrgName), alloc)...)
+	data = append(data, dumpLengthEncodedString([]byte(column.Name), alloc)...)
+	data = append(data, dumpLengthEncodedString([]byte(column.OrgName), alloc)...)
 
 	data = append(data, 0x0c)
 
-	data = append(data, Uint16ToBytes(column.Charset)...)
-	data = append(data, Uint32ToBytes(column.ColumnLength)...)
+	data = append(data, dumpUint16(column.Charset)...)
+	data = append(data, dumpUint32(column.ColumnLength)...)
 	data = append(data, column.Type)
-	data = append(data, Uint16ToBytes(column.Flag)...)
+	data = append(data, dumpUint16(column.Flag)...)
 	data = append(data, column.Decimal)
 	data = append(data, 0, 0)
 
 	if column.DefaultValue != nil {
-		data = append(data, Uint64ToBytes(uint64(len(column.DefaultValue)))...)
+		data = append(data, dumpUint64(uint64(len(column.DefaultValue)))...)
 		data = append(data, []byte(column.DefaultValue)...)
 	}
 

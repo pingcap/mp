@@ -4,13 +4,15 @@ import (
 	"database/sql"
 	"testing"
 
-	. "gopkg.in/check.v1"
 	_ "github.com/go-sql-driver/mysql"
+	. "gopkg.in/check.v1"
 )
 
 func TestT(t *testing.T) {
 	TestingT(t)
 }
+
+var dsn = "root@tcp(localhost:4000)/test?strict=true"
 
 func runTests(c *C, dsn string, tests ...func(dbt *DBTest)) {
 	db, err := sql.Open("mysql", dsn)
@@ -51,7 +53,7 @@ func (dbt *DBTest) mustQuery(query string, args ...interface{}) (rows *sql.Rows)
 }
 
 func runTestCRUD(c *C) {
-	runTests(c, "root@tcp(localhost:4000)/test", func(dbt *DBTest) {
+	runTests(c, dsn, func(dbt *DBTest) {
 		// Create Table
 		dbt.mustExec("CREATE TABLE test (val TINYINT)")
 
@@ -62,6 +64,7 @@ func runTestCRUD(c *C) {
 
 		// Create Data
 		res := dbt.mustExec("INSERT INTO test VALUES (1)")
+		//		res := dbt.mustExec("INSERT INTO test VALUES (?)", 1)
 		count, err := res.RowsAffected()
 		dbt.Assert(err, IsNil)
 		dbt.Check(count, Equals, int64(1))
@@ -82,6 +85,7 @@ func runTestCRUD(c *C) {
 
 		// Update
 		res = dbt.mustExec(interpolateParams("UPDATE test SET val = 0 WHERE val = ?", false, 1))
+		//		res = dbt.mustExec("UPDATE test SET val = 0 WHERE val = ?", 1)
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
 		dbt.Check(count, Equals, int64(1))
@@ -99,6 +103,7 @@ func runTestCRUD(c *C) {
 
 		// Delete
 		res = dbt.mustExec("DELETE FROM test WHERE val = 0")
+		//		res = dbt.mustExec("DELETE FROM test WHERE val = ?", 0)
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
 		dbt.Check(count, Equals, int64(1))

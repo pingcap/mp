@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -44,23 +46,24 @@ func (s *Server) ReleaseToken(token *tokenlimiter.Token) {
 	s.concurrentLimiter.Put(token)
 }
 
-func (s *Server) newConn(netConn net.Conn) (cc *ClientConn, err error) {
-	log.Info("newConn", netConn.RemoteAddr().String())
-	ctx, err := s.driver.OpenCtx()
-	if err != nil {
-		return
-	}
+func (s *Server) newConn(conn net.Conn) (cc *ClientConn, err error) {
+	log.Info("newConn", conn.RemoteAddr().String())
 	cc = &ClientConn{
-		conn:         netConn,
-		pkg:          NewPacketIO(netConn),
+		conn:         conn,
+		pkg:          NewPacketIO(conn),
 		server:       s,
 		connectionId: atomic.AddUint32(&baseConnId, 1),
 		collation:    protocol.DEFAULT_COLLATION_ID,
 		charset:      protocol.DEFAULT_CHARSET,
 		alloc:        arena.NewArenaAllocator(32 * 1024),
-		ctx:          ctx,
 	}
-	cc.salt, _ = RandomBuf(20)
+	cc.salt = make([]byte, 20)
+	io.ReadFull(rand.Reader, cc.salt)
+	for i, b := range cc.salt {
+		if b == 0 {
+			cc.salt[i] = '0'
+		}
+	}
 	return
 }
 
@@ -129,6 +132,12 @@ func (s *Server) onConn(c net.Conn) {
 	}
 	if err := conn.Handshake(); err != nil {
 		log.Errorf("handshake error %s", errors.ErrorStack(err))
+		c.Close()
+		return
+	}
+	conn.ctx, err = s.driver.OpenCtx(conn.capability, uint8(conn.collation), conn.dbname)
+	if err != nil {
+		log.Errorf("open ctx error %s", errors.ErrorStack(err))
 		c.Close()
 		return
 	}
