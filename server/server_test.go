@@ -12,6 +12,8 @@ func TestT(t *testing.T) {
 	TestingT(t)
 }
 
+var regression = false
+
 var dsn = "root@tcp(localhost:4000)/test?strict=true"
 
 func runTests(c *C, dsn string, tests ...func(dbt *DBTest)) {
@@ -52,8 +54,15 @@ func (dbt *DBTest) mustQuery(query string, args ...interface{}) (rows *sql.Rows)
 	return rows
 }
 
-func runTestCRUD(c *C) {
+func (dbt *DBTest) mustQueryRows(query string, args ...interface{}) {
+	rows := dbt.mustQuery(query, args...)
+	dbt.Assert(rows.Next(), Equals, true)
+	rows.Close()
+}
+
+func runTestRegression(c *C) {
 	runTests(c, dsn, func(dbt *DBTest) {
+
 		// Create Table
 		dbt.mustExec("CREATE TABLE test (val TINYINT)")
 
@@ -113,5 +122,17 @@ func runTestCRUD(c *C) {
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
 		dbt.Check(count, Equals, int64(0))
+	})
+}
+
+func runTestIssue1(c *C) {
+	runTests(c, dsn, func(dbt *DBTest) {
+		dbt.mustQueryRows("SELECT 1")
+	})
+}
+
+func runTestIssue2(c *C) {
+	runTests(c, dsn, func(dbt *DBTest) {
+		dbt.mustExec("CREATE TABLE textable (id int, name text)")
 	})
 }

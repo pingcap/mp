@@ -283,7 +283,11 @@ func (cc *ClientConn) dispatch(data []byte) error {
 
 func (cc *ClientConn) useDB(db string) (err error) {
 	_, err = cc.ctx.Execute("use " + db)
-	return err
+	if err != nil {
+		return errors.Trace(err)
+	}
+	cc.dbname = db
+	return
 }
 
 func (cc *ClientConn) flush() error {

@@ -34,5 +34,7 @@ func (ts *MysqlTestSuite) TearDownSuite(c *C) {
 }
 
 func (ts *MysqlTestSuite) TestT(c *C) {
-	runTestCRUD(c)
+	if regression {
+		runTestRegression(c)
+	}
 }

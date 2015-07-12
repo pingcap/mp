@@ -25,7 +25,7 @@ func (qd *QlDriver) OpenCtx(capability uint32, collation uint8, dbname string) (
 			return nil, err
 		}
 	}
-	return &QlContext{session, "", 0}, nil
+	return &QlContext{session, dbname, 0}, nil
 }
 
 func (qc *QlContext) Status() uint16 {
