@@ -2,19 +2,18 @@ package server
 
 import (
 	"encoding/binary"
+	"fmt"
+	"math"
+	"reflect"
 	"strconv"
 	"strings"
 
-	"fmt"
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mp/protocol"
-	"math"
-	"reflect"
 )
 
 func (cc *ClientConn) handleStmtPrepare(sql string) error {
-
 	stmt, columns, params, err := cc.ctx.Prepare(sql)
 	if err != nil {
 		return err
@@ -32,7 +31,7 @@ func (cc *ClientConn) handleStmtPrepare(sql string) error {
 	//filter [00]
 	data = append(data, 0)
 	//warning count
-	data = append(data, 0, 0)
+	data = append(data, 0, 0) //TODO support warning count
 
 	if err := cc.writePacket(data); err != nil {
 		return err
@@ -96,10 +95,11 @@ func (cc *ClientConn) handleStmtExecute(data []byte) (err error) {
 	//skip iteration-count, always 1
 	pos += 4
 
-	var nullBitmaps []byte
-	var paramTypes []byte
-	var paramValues []byte
-
+	var (
+		nullBitmaps []byte
+		paramTypes  []byte
+		paramValues []byte
+	)
 	numParams := stmt.NumParams()
 	args := make([]interface{}, numParams)
 	if numParams > 0 {
@@ -119,7 +119,6 @@ func (cc *ClientConn) handleStmtExecute(data []byte) (err error) {
 
 			paramTypes = data[pos : pos+(numParams<<1)]
 			pos += (numParams << 1)
-
 			paramValues = data[pos:]
 		}
 
@@ -141,7 +140,6 @@ func (cc *ClientConn) handleStmtExecute(data []byte) (err error) {
 
 func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTypes, paramValues []byte) (err error) {
 	pos := 0
-
 	var v []byte
 	var n int = 0
 	var isNull bool

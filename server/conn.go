@@ -2,13 +2,13 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
 	"runtime"
 
-	"crypto/sha1"
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
 	"github.com/ngaut/log"
@@ -207,7 +207,7 @@ func (cc *ClientConn) Run() {
 		cc.alloc.Reset()
 		data, err := cc.readPacket()
 		if err != nil {
-			if err.Error() != io.EOF.Error() {
+			if ErrorNotEqual(err, io.EOF) {
 				log.Info(err)
 			}
 			return

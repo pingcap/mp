@@ -82,7 +82,7 @@ func ParseColumnInfo(data []byte) (col *ColumnInfo, err error) {
 
 	//type
 	col.Type = data[pos]
-	pos++
+	pos += 1
 
 	//flag
 	col.Flag = binary.LittleEndian.Uint16(data[pos:])
@@ -90,12 +90,11 @@ func ParseColumnInfo(data []byte) (col *ColumnInfo, err error) {
 
 	//decimals 1
 	col.Decimal = data[pos]
-	pos++
+	pos += 1
 
 	//filter [0x00][0x00]
 	pos += 2
 
-	col.DefaultValue = nil
 	//if more data, command was field list
 	if len(data) > pos {
 		//length of default value lenenc-int

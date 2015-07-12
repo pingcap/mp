@@ -7,15 +7,14 @@ import (
 	"io"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/juju/errors"
 	"github.com/ngaut/arena"
+	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mp/protocol"
-
-	"github.com/juju/errors"
-	"github.com/ngaut/log"
-	"strings"
 )
 
 func parseLengthEncodedInt(b []byte) (num uint64, isNull bool, n int) {
