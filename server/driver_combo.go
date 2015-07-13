@@ -5,6 +5,7 @@ import (
 
 	"github.com/ngaut/log"
 	"github.com/reborndb/go/errors2"
+	"reflect"
 )
 
 type ComboDriver struct {
@@ -39,12 +40,25 @@ func (d *Compare) String() string {
 			s += fmt.Sprintf("expect columns count %d, got %d\n", len(mysqlRset.Columns), len(qlRset.Columns))
 			return s
 		}
-		//TODO compare column defination
+
+		for i, v := range mysqlRset.Columns {
+			mtype := mysqlRset.Columns[i].Type
+			qType := qlRset.Columns[i].Type
+			if mtype != qType {
+				s += fmt.Sprintf("expect column %s type %d, got %d\n", v.Name, mtype, qType)
+				return s
+			}
+			//TODO compare more column info
+		}
+
 		if len(mysqlRset.Rows) != len(qlRset.Rows) {
 			s += fmt.Sprintf("expect rows count %d, got %d\n", len(mysqlRset.Rows), len(qlRset.Rows))
 			return s
 		}
-		//TODO compare row values.
+		if !reflect.DeepEqual(d.rset[0].Rows, d.rset[1].Rows) {
+			s += fmt.Sprintf("expect %v\n", d.rset[0].Rows)
+			s += fmt.Sprintf("got %v\n")
+		}
 	}
 	if d.err[0] == nil && d.err[1] != nil {
 		s += fmt.Sprintf("expect nil error, got %s\n", d.err[1].Error())
