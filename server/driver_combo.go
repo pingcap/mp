@@ -6,7 +6,7 @@ import (
 	. "github.com/pingcap/mp/protocol"
 	"github.com/pingcap/ql"
 	"github.com/reborndb/go/errors2"
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 )
 
 type ComboDriver struct {
@@ -185,7 +185,7 @@ func (cc *ComboContext) Execute(sql string, args ...interface{}) (rs *ResultSet,
 	comp.err[1] = qerr
 	compStr := comp.String()
 	if compStr != "" {
-		log.Warn(compStr)
+		log.Warning(compStr)
 	}
 	if cc.useQlResult {
 		return qrs, qerr
