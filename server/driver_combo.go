@@ -49,7 +49,7 @@ func (d *Compare) String() string {
 		//TODO compare row values.
 	}
 	if d.err[0] == nil && d.err[1] != nil {
-		s += fmt.Sprintf("expect nil error, got %\n", d.err[1].Error())
+		s += fmt.Sprintf("expect nil error, got %s\n", d.err[1].Error())
 		return s
 	} else if d.err[0] != nil && d.err[1] == nil {
 		s += fmt.Sprintf("expected err %s, got nil error\n", d.err[0])
@@ -80,6 +80,8 @@ func (d *Compare) String() string {
 	return "" // no diffierence return empty string
 }
 
+func (d *Compare) EqualColumns(a *ColumnInfo, b *)
+
 //Combo context will send request to both mysql and ql, then compare the results
 type ComboContext struct {
 	useQlResult bool
@@ -105,9 +107,9 @@ func (cd *ComboDriver) OpenCtx(capability uint32, collation uint8, dbname string
 
 	session, _ := ql.CreateSession()
 	_, err = session.Execute("CREATE DATABASE IF NOT EXISTS test")
-	if err != nil {
-		return nil, err
-	}
+//	if err != nil {
+//		return nil, err
+//	}
 	if dbname != "" {
 		_, err = session.Execute("use " + dbname)
 		if err != nil {

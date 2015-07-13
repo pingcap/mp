@@ -24,7 +24,8 @@ func (ts *QLTestSuite) SetUpSuite(c *C) {
 	}
 	ctx, err := ts.qldrv.OpenCtx(DEFAULT_CAPABILITY, 33, "")
 	c.Assert(err, IsNil)
-	ctx.Execute("CREATE DATABASE IF NOT EXISTS test")
+	_, err = ctx.Execute("CREATE DATABASE IF NOT EXISTS test")
+//	c.Assert(err, IsNil)
 	ctx.Close()
 	server, err := NewServer(cfg, ts.qldrv)
 	c.Assert(err, IsNil)
