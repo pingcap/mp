@@ -14,6 +14,7 @@ import (
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	"github.com/pingcap/mp/protocol"
+	"github.com/reborndb/go/errors2"
 )
 
 var DEFAULT_CAPABILITY uint32 = protocol.CLIENT_LONG_PASSWORD | protocol.CLIENT_LONG_FLAG |
@@ -207,7 +208,7 @@ func (cc *ClientConn) Run() {
 		cc.alloc.Reset()
 		data, err := cc.readPacket()
 		if err != nil {
-			if ErrorNotEqual(err, io.EOF) {
+			if errors2.ErrorNotEqual(err, io.EOF) {
 				log.Info(err)
 			}
 			return
