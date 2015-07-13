@@ -22,9 +22,9 @@ func (ts *QLTestSuite) SetUpSuite(c *C) {
 		Password: "",
 		LogLevel: "debug",
 	}
-	ctx, _ := ts.qldrv.OpenCtx(DEFAULT_CAPABILITY, 33, "")
-	_, err := ctx.Execute("CREATE DATABASE IF NOT EXISTS test")
+	ctx, err := ts.qldrv.OpenCtx(DEFAULT_CAPABILITY, 33, "")
 	c.Assert(err, IsNil)
+	ctx.Execute("CREATE DATABASE IF NOT EXISTS test")
 	ctx.Close()
 	server, err := NewServer(cfg, ts.qldrv)
 	c.Assert(err, IsNil)

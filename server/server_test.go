@@ -12,7 +12,7 @@ func TestT(t *testing.T) {
 	TestingT(t)
 }
 
-var regression = false
+var regression = true
 
 var dsn = "root@tcp(localhost:4000)/test?strict=true"
 

@@ -26,7 +26,8 @@ func main() {
 	log.SetLevelByString(cfg.LogLevel)
 
 	var svr *server.Server
-	svr, err := server.NewServer(cfg, &server.QlDriver{})
+	driver := server.NewComboDriver(false)
+	svr, err := server.NewServer(cfg, driver)
 	if err != nil {
 		log.Error(err.Error())
 		return

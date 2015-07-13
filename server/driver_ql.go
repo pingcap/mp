@@ -49,7 +49,7 @@ func (qc *QlContext) WarningCount() uint16 {
 }
 
 func (qc *QlContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
-	qrsList, err := qc.session.Execute(sql, args...)
+	qrsList, err := qc.session.Execute(interpolateParams(sql, qc.session.Status()&SERVER_STATUS_NO_BACKSLASH_ESCAPED > 0, args...))
 	if err != nil {
 		return
 	}

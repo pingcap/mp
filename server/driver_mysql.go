@@ -53,7 +53,7 @@ type MysqlConn struct {
 func (md *MysqlDriver) OpenCtx(capability uint32, collation uint8, dbname string) (ctx IContext, err error) {
 	mc := new(MysqlConn)
 	mc.stmts = make(map[int]*MysqlStatement)
-	mc.capability = capability & (^CLIENT_PLUGIN_AUTH)
+	mc.capability = capability & DEFAULT_CAPABILITY
 	mc.collation = CollationId(collation)
 	err = mc.Connect(":3306", "root", "", dbname)
 	if err != nil {

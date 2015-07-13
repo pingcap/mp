@@ -356,11 +356,11 @@ func (cc *ClientConn) handleQuery(sql string) (err error) {
 		return errors.Trace(err)
 	}
 	if rs != nil {
-		cc.writeResultset(rs, false)
+		err = cc.writeResultset(rs, false)
 	} else {
-		cc.writeOK()
+		err = cc.writeOK()
 	}
-	return
+	return errors.Trace(err)
 }
 
 func (cc *ClientConn) handleFieldList(sql string) (err error) {

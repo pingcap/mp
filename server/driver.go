@@ -12,8 +12,8 @@ type IContext interface {
 	Status() uint16
 	LastInsertID() uint64
 	AffectedRows() uint64
-	CurrentDB() string
 	WarningCount() uint16
+	CurrentDB() string
 	Execute(sql string, args ...interface{}) (*ResultSet, error)
 	Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error)
 	GetStatement(stmtId int) IStatement
