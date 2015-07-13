@@ -80,8 +80,6 @@ func (d *Compare) String() string {
 	return "" // no diffierence return empty string
 }
 
-func (d *Compare) EqualColumns(a *ColumnInfo, b *)
-
 //Combo context will send request to both mysql and ql, then compare the results
 type ComboContext struct {
 	useQlResult bool
