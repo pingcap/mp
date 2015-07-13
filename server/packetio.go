@@ -1,10 +1,13 @@
-package protocol
+package server
 
 import (
 	"bufio"
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/juju/errors"
+	. "github.com/pingcap/mp/protocol"
 )
 
 type PacketIO struct {
@@ -27,24 +30,24 @@ func (p *PacketIO) ReadPacket() ([]byte, error) {
 	header := []byte{0, 0, 0, 0}
 
 	if _, err := io.ReadFull(p.rb, header); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	length := int(uint32(header[0]) | uint32(header[1])<<8 | uint32(header[2])<<16)
 	if length < 1 {
-		return nil, fmt.Errorf("invalid payload length %d", length)
+		return nil, errors.Trace(fmt.Errorf("invalid payload length %d", length))
 	}
 
 	sequence := uint8(header[3])
 	if sequence != p.Sequence {
-		return nil, fmt.Errorf("invalid sequence %d != %d", sequence, p.Sequence)
+		return nil, errors.Trace(fmt.Errorf("invalid sequence %d != %d", sequence, p.Sequence))
 	}
 
 	p.Sequence++
 
 	data := make([]byte, length)
 	if _, err := io.ReadFull(p.rb, data); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else {
 		if length < MaxPayloadLen {
 			return data, nil
@@ -53,7 +56,7 @@ func (p *PacketIO) ReadPacket() ([]byte, error) {
 		var buf []byte
 		buf, err = p.ReadPacket()
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		} else {
 			return append(data, buf...), nil
 		}
@@ -88,9 +91,9 @@ func (p *PacketIO) WritePacket(data []byte) error {
 	data[3] = p.Sequence
 
 	if n, err := p.wb.Write(data); err != nil {
-		return ErrBadConn
+		return errors.Trace(ErrBadConn)
 	} else if n != len(data) {
-		return ErrBadConn
+		return errors.Trace(ErrBadConn)
 	} else {
 		p.Sequence++
 		return nil

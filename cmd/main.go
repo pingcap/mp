@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -10,33 +9,24 @@ import (
 	"syscall"
 
 	"github.com/ngaut/log"
+	"github.com/pingcap/mp/etc"
 	"github.com/pingcap/mp/server"
 )
-
-var configFile = flag.String("config", "./etc/cfg.toml", "cm config file, support json & toml")
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	flag.Parse()
-
-	if len(*configFile) == 0 {
-		log.Error("must use a config file")
-		return
-	}
-
-	cfg, err := server.ParseConfigFile(*configFile)
-	if err != nil {
-		log.Error(err.Error())
-		return
+	cfg := &etc.Config{
+		Addr:     ":4000",
+		User:     "root",
+		Password: "",
+		LogLevel: "debug",
 	}
 
 	log.SetLevelByString(cfg.LogLevel)
 
-	log.CrashLog("./cm-proxy.dump")
-
 	var svr *server.Server
-	svr, err = server.NewServer(cfg, server.NewQlDriver())
+	svr, err := server.NewServer(cfg, &server.QlDriver{})
 	if err != nil {
 		log.Error(err.Error())
 		return

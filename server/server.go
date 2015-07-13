@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -25,7 +27,7 @@ type Server struct {
 	rwlock            *sync.RWMutex
 	concurrentLimiter *tokenlimiter.TokenLimiter
 	counter           *stats.Counters
-	clients           map[uint32]*Conn
+	clients           map[uint32]*ClientConn
 }
 
 func (s *Server) IncCounter(key string) {
@@ -44,21 +46,25 @@ func (s *Server) ReleaseToken(token *tokenlimiter.Token) {
 	s.concurrentLimiter.Put(token)
 }
 
-func (s *Server) newConn(co net.Conn) *Conn {
-	log.Info("newConn", co.RemoteAddr().String())
-	c := &Conn{
-		c:            co,
-		pkg:          protocol.NewPacketIO(co),
+func (s *Server) newConn(conn net.Conn) (cc *ClientConn, err error) {
+	log.Info("newConn", conn.RemoteAddr().String())
+	cc = &ClientConn{
+		conn:         conn,
+		pkg:          NewPacketIO(conn),
 		server:       s,
 		connectionId: atomic.AddUint32(&baseConnId, 1),
 		collation:    protocol.DEFAULT_COLLATION_ID,
 		charset:      protocol.DEFAULT_CHARSET,
 		alloc:        arena.NewArenaAllocator(32 * 1024),
-		ctx:          s.driver.OpenCtx(),
 	}
-	c.salt, _ = protocol.RandomBuf(20)
-
-	return c
+	cc.salt = make([]byte, 20)
+	io.ReadFull(rand.Reader, cc.salt)
+	for i, b := range cc.salt {
+		if b == 0 {
+			cc.salt[i] = '0'
+		}
+	}
+	return
 }
 
 func (s *Server) GetRWlock() *sync.RWMutex {
@@ -81,7 +87,7 @@ func NewServer(cfg *etc.Config, driver IDriver) (*Server, error) {
 		concurrentLimiter: tokenlimiter.NewTokenLimiter(100),
 		counter:           stats.NewCounters(""),
 		rwlock:            &sync.RWMutex{},
-		clients:           make(map[uint32]*Conn),
+		clients:           make(map[uint32]*ClientConn),
 	}
 
 	var err error
@@ -119,9 +125,19 @@ func (s *Server) Close() {
 }
 
 func (s *Server) onConn(c net.Conn) {
-	conn := s.newConn(c)
+	conn, err := s.newConn(c)
+	if err != nil {
+		log.Errorf("newConn error %s", errors.ErrorStack(err))
+		return
+	}
 	if err := conn.Handshake(); err != nil {
 		log.Errorf("handshake error %s", errors.ErrorStack(err))
+		c.Close()
+		return
+	}
+	conn.ctx, err = s.driver.OpenCtx(conn.capability, uint8(conn.collation), conn.dbname)
+	if err != nil {
+		log.Errorf("open ctx error %s", errors.ErrorStack(err))
 		c.Close()
 		return
 	}

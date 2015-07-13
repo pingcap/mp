@@ -1,0 +1,601 @@
+package server
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"math"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/juju/errors"
+	"github.com/ngaut/arena"
+	"github.com/ngaut/log"
+	"github.com/pingcap/mp/hack"
+	. "github.com/pingcap/mp/protocol"
+)
+
+func parseLengthEncodedInt(b []byte) (num uint64, isNull bool, n int) {
+	switch b[0] {
+	// 251: NULL
+	case 0xfb:
+		n = 1
+		isNull = true
+		return
+
+	// 252: value of following 2
+	case 0xfc:
+		num = uint64(b[1]) | uint64(b[2])<<8
+		n = 3
+		return
+
+	// 253: value of following 3
+	case 0xfd:
+		num = uint64(b[1]) | uint64(b[2])<<8 | uint64(b[3])<<16
+		n = 4
+		return
+
+	// 254: value of following 8
+	case 0xfe:
+		num = uint64(b[1]) | uint64(b[2])<<8 | uint64(b[3])<<16 |
+			uint64(b[4])<<24 | uint64(b[5])<<32 | uint64(b[6])<<40 |
+			uint64(b[7])<<48 | uint64(b[8])<<56
+		n = 9
+		return
+	}
+
+	// 0-250: value of first byte
+	num = uint64(b[0])
+	n = 1
+	return
+}
+
+func dumpLengthEncodedInt(n uint64) []byte {
+	switch {
+	case n <= 250:
+		return tinyIntCache[n]
+
+	case n <= 0xffff:
+		return []byte{0xfc, byte(n), byte(n >> 8)}
+
+	case n <= 0xffffff:
+		return []byte{0xfd, byte(n), byte(n >> 8), byte(n >> 16)}
+
+	case n <= 0xffffffffffffffff:
+		return []byte{0xfe, byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24),
+			byte(n >> 32), byte(n >> 40), byte(n >> 48), byte(n >> 56)}
+	}
+
+	return nil
+}
+
+func parseLengthEncodedBytes(b []byte) ([]byte, bool, int, error) {
+	// Get length
+	num, isNull, n := parseLengthEncodedInt(b)
+	if num < 1 {
+		return nil, isNull, n, nil
+	}
+
+	n += int(num)
+
+	// Check data length
+	if len(b) >= n {
+		return b[n-int(num) : n], false, n, nil
+	}
+
+	return nil, false, n, io.EOF
+}
+
+func parseLengthEncodedString(b []byte) (string, bool, int, error) {
+	// Get length
+	num, isNull, n := parseLengthEncodedInt(b)
+	if num < 1 {
+		return "", isNull, n, nil
+	}
+
+	n += int(num)
+
+	// Check data length
+	if len(b) >= n {
+		return hack.String(b[n-int(num) : n]), false, n, nil
+	}
+
+	return "", false, n, io.EOF
+}
+
+func skipLengthEnodedString(b []byte) (int, error) {
+	// Get length
+	num, _, n := parseLengthEncodedInt(b)
+	if num < 1 {
+		return n, nil
+	}
+
+	n += int(num)
+
+	// Check data length
+	if len(b) >= n {
+		return n, nil
+	}
+	return n, io.EOF
+}
+
+func dumpLengthEncodedString(b []byte, alloc arena.ArenaAllocator) []byte {
+	data := alloc.AllocBytes(len(b) + 9)
+	data = append(data, dumpLengthEncodedInt(uint64(len(b)))...)
+	data = append(data, b...)
+	return data
+}
+
+func dumpUint16(n uint16) []byte {
+	return []byte{
+		byte(n),
+		byte(n >> 8),
+	}
+}
+
+func dumpUint32(n uint32) []byte {
+	return []byte{
+		byte(n),
+		byte(n >> 8),
+		byte(n >> 16),
+		byte(n >> 24),
+	}
+}
+
+func dumpUint64(n uint64) []byte {
+	return []byte{
+		byte(n),
+		byte(n >> 8),
+		byte(n >> 16),
+		byte(n >> 24),
+		byte(n >> 32),
+		byte(n >> 40),
+		byte(n >> 48),
+		byte(n >> 56),
+	}
+}
+
+var tinyIntCache [251][]byte
+
+func init() {
+	for i := 0; i < len(tinyIntCache); i++ {
+		tinyIntCache[i] = []byte{byte(i)}
+	}
+}
+
+const timeFormat = "2006-01-02 15:04:05.999999"
+
+func parseTextDateTime(timeStr string, mysqlType uint8, loc *time.Location) (t time.Time, err error) {
+	if len(timeStr) > len(timeFormat) {
+		err = errors.New("illegal argument")
+		return
+	}
+	if mysqlType != MYSQL_TYPE_TIMESTAMP || loc == nil {
+		loc = time.Local
+	}
+	t, err = time.ParseInLocation(timeFormat[:len(timeStr)], timeStr, loc)
+	return
+}
+
+func dumpTextDateTime(t time.Time, mysqlType uint8, loc *time.Location) []byte {
+	if mysqlType == MYSQL_TYPE_TIMESTAMP && loc != nil {
+		t = t.In(loc)
+	}
+	if mysqlType == MYSQL_TYPE_DATE {
+		return []byte(t.Format("2006-01-02"))
+	}
+	return []byte(t.Format(timeFormat))
+}
+
+func parseTextTime(timeStr string) (dur time.Duration, err error) {
+	var sign time.Duration = 1
+	if timeStr[0] == '-' {
+		timeStr = timeStr[1:]
+		sign = -1
+	}
+	var hour, minute, second, fraction time.Duration
+	if strings.IndexByte(timeStr, '.') == -1 {
+		_, err = fmt.Sscanf(timeStr, "%d:%d:%d", &hour, &minute, &second)
+	} else {
+		_, err = fmt.Sscanf(timeStr, "%d:%d:%d.%d", &hour, &minute, &second, &fraction)
+	}
+
+	if err != nil {
+		return
+	}
+	dur = hour*time.Hour + minute*time.Minute + second*time.Second + fraction*time.Microsecond
+	dur *= sign
+	return
+}
+
+func dumpTextTime(dur time.Duration) (data []byte) {
+	buf := new(bytes.Buffer)
+	if dur < 0 {
+		buf.WriteByte('-')
+		dur = -dur
+	}
+	hours := dur / time.Hour
+	dur -= hours * time.Hour
+	minutes := dur / time.Minute
+	dur -= minutes * time.Minute
+	seconds := dur / time.Second
+	dur -= seconds * time.Second
+	fraction := dur / time.Microsecond
+	if fraction == 0 {
+		fmt.Fprintf(buf, "%02d:%02d:%02d", hours, minutes, seconds)
+	} else {
+		fmt.Fprintf(buf, "%02d:%02d:%02d.%06d", hours, minutes, seconds, fraction)
+	}
+	return buf.Bytes()
+}
+
+func parseBinaryTime(n int, data []byte) (dur time.Duration, err error) {
+	var sign time.Duration = 1
+	if data[0] == 1 {
+		sign = -1
+	}
+	switch n {
+	case 8:
+		dur = time.Duration(data[1])*24*time.Hour + time.Duration(data[5])*time.Hour +
+			time.Duration(data[6])*time.Minute + time.Duration(data[7])*time.Second
+	case 12:
+		dur = time.Duration(data[1])*24*time.Hour + time.Duration(data[5])*time.Hour +
+			time.Duration(data[6])*time.Minute + time.Duration(data[7])*time.Second +
+			time.Duration(binary.LittleEndian.Uint32(data[8:12]))*time.Microsecond
+	default:
+		err = fmt.Errorf("invalid time packet length %d", n)
+	}
+
+	dur *= sign
+	return
+}
+
+func dumpBinaryTime(dur time.Duration) (data []byte) {
+	if dur == 0 {
+		data = tinyIntCache[0]
+		return
+	}
+	data = make([]byte, 13)
+	data[0] = 12
+	if dur < 0 {
+		data[1] = 1
+		dur = -dur
+	}
+	days := dur / (24 * time.Hour)
+	dur -= days * 24 * time.Hour
+	data[2] = byte(days)
+	hours := dur / time.Hour
+	dur -= hours * time.Hour
+	data[6] = byte(hours)
+	minutes := dur / time.Minute
+	dur -= minutes * time.Minute
+	data[7] = byte(minutes)
+	seconds := dur / time.Second
+	dur -= seconds * time.Second
+	data[8] = byte(seconds)
+	if dur == 0 {
+		data[0] = 8
+		return data[:9]
+	}
+	binary.LittleEndian.PutUint32(data[9:13], uint32(dur/time.Microsecond))
+	return
+}
+
+// Mysql Timestamp type is time zone dependent, other date time types are not.
+func parseBinaryDateTime(num int, data []byte, mysqlType uint8, loc *time.Location) (t time.Time, err error) {
+	if loc == nil || mysqlType != MYSQL_TYPE_TIMESTAMP {
+		loc = time.Local
+	}
+	switch num {
+	case 0:
+		t = time.Time{}
+	case 4:
+		t = time.Date(
+			int(binary.LittleEndian.Uint16(data[:2])), // year
+			time.Month(data[2]),                       // month
+			int(data[3]),                              // day
+			0, 0, 0, 0,
+			loc,
+		)
+	case 7:
+		t = time.Date(
+			int(binary.LittleEndian.Uint16(data[:2])), // year
+			time.Month(data[2]),                       // month
+			int(data[3]),                              // day
+			int(data[4]),                              // hour
+			int(data[5]),                              // minutes
+			int(data[6]),                              // seconds
+			0,
+			loc,
+		)
+	case 11:
+		t = time.Date(
+			int(binary.LittleEndian.Uint16(data[:2])), // year
+			time.Month(data[2]),                       // month
+			int(data[3]),                              // day
+			int(data[4]),                              // hour
+			int(data[5]),                              // minutes
+			int(data[6]),                              // seconds
+			int(binary.LittleEndian.Uint32(data[7:11]))*1000, // nanoseconds
+			loc,
+		)
+	default:
+		err = fmt.Errorf("Invalid DATETIME-packet length %d", num)
+	}
+	return
+}
+
+func dumpBinaryDateTime(t time.Time, mysqlType uint8, loc *time.Location) (data []byte) {
+	if mysqlType == MYSQL_TYPE_TIMESTAMP && loc != nil {
+		t = t.In(loc)
+	}
+	switch mysqlType {
+	case MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_DATETIME:
+		data = append(data, 11)
+		data = append(data, dumpUint16(uint16(t.Year()))...) //year
+		data = append(data, byte(t.Month()), byte(t.Day()), byte(t.Hour()), byte(t.Minute()), byte(t.Second()))
+		data = append(data, dumpUint32(uint32((t.Nanosecond() / 1000)))...)
+	case MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE:
+		data = append(data, 4)
+		data = append(data, dumpUint16(uint16(t.Year()))...) //year
+		data = append(data, byte(t.Month()), byte(t.Day()))
+	}
+	return
+}
+
+func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{}, error) {
+	values := make([]interface{}, len(columns))
+	if rowData[0] != OK_HEADER {
+		return nil, ErrMalformPacket
+	}
+
+	pos := 1 + ((len(columns) + 7 + 2) >> 3)
+
+	nullBitmap := rowData[1:pos]
+	var isNull bool
+	var err error
+	var n int
+	var v []byte
+	for i := range values {
+		if nullBitmap[(i+2)/8]&(1<<(uint(i+2)%8)) > 0 {
+			values[i] = nil
+			continue
+		}
+
+		switch columns[i].Type {
+		case MYSQL_TYPE_NULL:
+			values[i] = nil
+			continue
+
+		case MYSQL_TYPE_TINY:
+			values[i] = int64(rowData[pos])
+			pos++
+			continue
+		case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
+			values[i] = int64((binary.LittleEndian.Uint16(rowData[pos : pos+2])))
+			pos += 2
+			continue
+
+		case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+			values[i] = int64(binary.LittleEndian.Uint32(rowData[pos : pos+4]))
+			pos += 4
+			continue
+
+		case MYSQL_TYPE_LONGLONG:
+			values[i] = int64(binary.LittleEndian.Uint64(rowData[pos : pos+8]))
+			pos += 8
+			continue
+
+		case MYSQL_TYPE_FLOAT:
+			values[i] = float64(math.Float32frombits(binary.LittleEndian.Uint32(rowData[pos : pos+4])))
+			pos += 4
+			continue
+
+		case MYSQL_TYPE_DOUBLE:
+			values[i] = math.Float64frombits(binary.LittleEndian.Uint64(rowData[pos : pos+8]))
+			pos += 8
+			continue
+
+		case MYSQL_TYPE_DECIMAL, MYSQL_TYPE_NEWDECIMAL, MYSQL_TYPE_VARCHAR,
+			MYSQL_TYPE_BIT, MYSQL_TYPE_ENUM, MYSQL_TYPE_SET, MYSQL_TYPE_TINY_BLOB,
+			MYSQL_TYPE_MEDIUM_BLOB, MYSQL_TYPE_LONG_BLOB, MYSQL_TYPE_BLOB,
+			MYSQL_TYPE_VAR_STRING, MYSQL_TYPE_STRING, MYSQL_TYPE_GEOMETRY:
+			v, isNull, n, err = parseLengthEncodedBytes(rowData[pos:])
+			pos += n
+			if err != nil {
+				return nil, err
+			}
+
+			if !isNull {
+				values[i] = v
+				continue
+			} else {
+				values[i] = nil
+				continue
+			}
+		case MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE, MYSQL_TYPE_DATETIME, MYSQL_TYPE_TIMESTAMP:
+			var num uint64
+			num, isNull, n = parseLengthEncodedInt(rowData[pos:])
+
+			pos += n
+
+			if isNull {
+				values[i] = nil
+				continue
+			}
+			values[i], err = parseBinaryDateTime(int(num), rowData[pos:], columns[i].Type, nil)
+			pos += int(num)
+
+			if err != nil {
+				return nil, err
+			}
+
+		case MYSQL_TYPE_TIME:
+			var num uint64
+			num, isNull, n = parseLengthEncodedInt(rowData[pos:])
+
+			pos += n
+
+			if isNull {
+				values[i] = nil
+				continue
+			}
+
+			values[i], err = parseBinaryTime(int(num), rowData[pos:])
+			pos += int(num)
+
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, fmt.Errorf("Stmt Unknown FieldType %d %s", columns[i].Type, columns[i].Name)
+		}
+	}
+	return values, err
+}
+
+func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row []interface{}) (data []byte, err error) {
+	if len(columns) != len(row) {
+		err = ErrMalformPacket
+		return
+	}
+	data = append(data, OK_HEADER)
+	nullsLen := ((len(columns) + 7 + 2) / 8)
+	nulls := make([]byte, nullsLen)
+	for i, val := range row {
+		if val == nil {
+			byte_pos := (i + 2) / 8
+			bit_pos := byte((i + 2) % 8)
+			nulls[byte_pos] |= 1 << bit_pos
+		}
+	}
+	data = append(data, nulls...)
+	for i, val := range row {
+		switch v := val.(type) {
+		case int64:
+			switch columns[i].Type {
+			case MYSQL_TYPE_TINY:
+				data = append(data, byte(v))
+			case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
+				data = append(data, dumpUint16(uint16(v))...)
+			case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+				data = append(data, dumpUint32(uint32(v))...)
+			case MYSQL_TYPE_LONGLONG:
+				data = append(data, dumpUint64(uint64(v))...)
+			}
+		case uint64:
+			switch columns[i].Type {
+			case MYSQL_TYPE_TINY:
+				data = append(data, byte(v))
+			case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
+				data = append(data, dumpUint16(uint16(v))...)
+			case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+				data = append(data, dumpUint32(uint32(v))...)
+			case MYSQL_TYPE_LONGLONG:
+				data = append(data, dumpUint64(uint64(v))...)
+			}
+		case float32:
+			floatBits := math.Float32bits(float32(val.(float64)))
+			data = append(data, dumpUint32(floatBits)...)
+		case float64:
+			floatBits := math.Float64bits(val.(float64))
+			data = append(data, dumpUint64(floatBits)...)
+		case string:
+			data = append(data, dumpLengthEncodedString(hack.Slice(v), alloc)...)
+		case []byte:
+			data = append(data, dumpLengthEncodedString(v, alloc)...)
+		case time.Time:
+			data = append(data, dumpBinaryDateTime(v, columns[i].Type, nil)...)
+		case time.Duration:
+			data = append(data, dumpBinaryTime(v)...)
+		}
+	}
+	return
+}
+
+func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interface{}, err error) {
+	values = make([]interface{}, len(columns))
+	var v []byte
+	var isNull, isUnsigned bool
+	var pos int = 0
+	var n int = 0
+	for i, col := range columns {
+		v, isNull, n, err = parseLengthEncodedBytes(rowData[pos:])
+		if err != nil {
+			return nil, errors.Trace(err)
+		}
+
+		pos += n
+
+		if isNull {
+			values[i] = nil
+		} else {
+			isUnsigned = (col.Flag&UNSIGNED_FLAG > 0)
+
+			switch col.Type {
+			case MYSQL_TYPE_TINY, MYSQL_TYPE_SHORT, MYSQL_TYPE_INT24,
+				MYSQL_TYPE_LONGLONG, MYSQL_TYPE_YEAR:
+				if isUnsigned {
+					values[i], err = strconv.ParseUint(hack.String(v), 10, 64)
+				} else {
+					values[i], err = strconv.ParseInt(hack.String(v), 10, 64)
+				}
+			case MYSQL_TYPE_FLOAT, MYSQL_TYPE_DOUBLE:
+				values[i], err = strconv.ParseFloat(hack.String(v), 64)
+			case MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE, MYSQL_TYPE_DATETIME:
+				values[i], err = parseTextDateTime(hack.String(v), col.Type, nil)
+			case MYSQL_TYPE_TIME:
+				values[i], err = parseTextTime(hack.String(v))
+			default:
+				values[i] = v
+			}
+
+			if err != nil {
+				log.Debug(col.Type, hack.String(v))
+				return nil, errors.Trace(err)
+			}
+		}
+	}
+	return
+}
+
+func dumpTextValue(mysqlType uint8, value interface{}) ([]byte, error) {
+	switch v := value.(type) {
+	case int8:
+		return strconv.AppendInt(nil, int64(v), 10), nil
+	case int16:
+		return strconv.AppendInt(nil, int64(v), 10), nil
+	case int32:
+		return strconv.AppendInt(nil, int64(v), 10), nil
+	case int64:
+		return strconv.AppendInt(nil, int64(v), 10), nil
+	case int:
+		return strconv.AppendInt(nil, int64(v), 10), nil
+	case uint8:
+		return strconv.AppendUint(nil, uint64(v), 10), nil
+	case uint16:
+		return strconv.AppendUint(nil, uint64(v), 10), nil
+	case uint32:
+		return strconv.AppendUint(nil, uint64(v), 10), nil
+	case uint64:
+		return strconv.AppendUint(nil, uint64(v), 10), nil
+	case uint:
+		return strconv.AppendUint(nil, uint64(v), 10), nil
+	case float32:
+		return strconv.AppendFloat(nil, float64(v), 'f', -1, 64), nil
+	case float64:
+		return strconv.AppendFloat(nil, float64(v), 'f', -1, 64), nil
+	case []byte:
+		return v, nil
+	case string:
+		return hack.Slice(v), nil
+	case time.Time:
+		return dumpTextDateTime(v, mysqlType, nil), nil
+	case time.Duration:
+		return dumpTextTime(v), nil
+	default:
+		return nil, fmt.Errorf("invalid type %T", value)
+	}
+}
