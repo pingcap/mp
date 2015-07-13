@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/cockroachdb/cockroach/util/log"
 	. "github.com/pingcap/mp/protocol"
 	"github.com/pingcap/ql"
 	"github.com/pingcap/ql/field"
@@ -125,4 +126,15 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	ci.ColumnLength = uint32(qlfield.Flen)
 	ci.Type = qlTypeMap[qlfield.TypeStr]
 	return
+}
+
+func CreateQlTestDatabase() {
+	qd := &QlDriver{}
+	qc, err := qd.OpenCtx(DEFAULT_CAPABILITY, 33, "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	qc.Execute("CREATE DATABASE IF NOT EXISTS test")
+	qc.Execute("CREATE DATABASE IF NOT EXISTS gotest")
+	qc.Close()
 }

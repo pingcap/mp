@@ -24,9 +24,10 @@ func main() {
 	}
 
 	log.SetLevelByString(cfg.LogLevel)
-
+	server.CreateQlTestDatabase()
 	var svr *server.Server
 	driver := server.NewComboDriver(false)
+	//	driver := &server.MysqlDriver{}
 	svr, err := server.NewServer(cfg, driver)
 	if err != nil {
 		log.Error(err.Error())

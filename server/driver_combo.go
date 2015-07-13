@@ -3,10 +3,8 @@ package server
 import (
 	"fmt"
 
-	. "github.com/pingcap/mp/protocol"
-	"github.com/pingcap/ql"
-	"github.com/reborndb/go/errors2"
 	"github.com/ngaut/log"
+	"github.com/reborndb/go/errors2"
 )
 
 type ComboDriver struct {
@@ -83,8 +81,8 @@ func (d *Compare) String() string {
 //Combo context will send request to both mysql and ql, then compare the results
 type ComboContext struct {
 	useQlResult bool
-	mc          *MysqlConn
-	qc          *QlContext
+	mc          IContext
+	qc          IContext
 }
 
 func NewComboDriver(useQlResult bool) *ComboDriver {
@@ -94,30 +92,16 @@ func NewComboDriver(useQlResult bool) *ComboDriver {
 }
 
 func (cd *ComboDriver) OpenCtx(capability uint32, collation uint8, dbname string) (IContext, error) {
-	mc := new(MysqlConn)
-	mc.stmts = make(map[int]*MysqlStatement)
-	mc.capability = capability & DEFAULT_CAPABILITY
-	mc.collation = CollationId(collation)
-	err := mc.Connect(":3306", "root", "", dbname)
+	md := &MysqlDriver{}
+	mc, err := md.OpenCtx(capability, collation, dbname)
 	if err != nil {
 		return nil, err
 	}
-
-	session, _ := ql.CreateSession()
-	_, err = session.Execute("CREATE DATABASE IF NOT EXISTS test")
-//	if err != nil {
-//		return nil, err
-//	}
-	if dbname != "" {
-		_, err = session.Execute("use " + dbname)
-		if err != nil {
-			return nil, err
-		}
+	qd := &QlDriver{}
+	qc, err := qd.OpenCtx(capability, collation, dbname)
+	if err != nil {
+		return nil, err
 	}
-	qc := &QlContext{
-		session: session,
-	}
-
 	comCtx := new(ComboContext)
 	comCtx.mc = mc
 	comCtx.qc = qc
@@ -173,14 +157,14 @@ func (cc *ComboContext) Execute(sql string, args ...interface{}) (rs *ResultSet,
 	comp.sql = sql
 	comp.rset[0] = mrs
 	comp.rset[1] = qrs
-	comp.affectedRows[0] = cc.mc.affectedRows
+	comp.affectedRows[0] = cc.mc.AffectedRows()
 	comp.affectedRows[1] = cc.qc.AffectedRows()
-	comp.lastInsertID[0] = cc.mc.lastInsertID
+	comp.lastInsertID[0] = cc.mc.LastInsertID()
 	comp.lastInsertID[1] = cc.qc.LastInsertID()
-	comp.status[0] = cc.mc.status
+	comp.status[0] = cc.mc.Status()
 	comp.status[1] = cc.qc.Status()
-	comp.warningCount[0] = cc.mc.warningCount
-	comp.warningCount[1] = cc.qc.warningCount
+	comp.warningCount[0] = cc.mc.WarningCount()
+	comp.warningCount[1] = cc.qc.WarningCount()
 	comp.err[0] = merr
 	comp.err[1] = qerr
 	compStr := comp.String()

@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/juju/errors"
@@ -55,7 +54,7 @@ func (md *MysqlDriver) OpenCtx(capability uint32, collation uint8, dbname string
 	mc.stmts = make(map[int]*MysqlStatement)
 	mc.capability = capability & DEFAULT_CAPABILITY
 	mc.collation = CollationId(collation)
-	err = mc.Connect(":3306", "root", "", dbname)
+	err = mc.connect(":3306", "root", "", dbname)
 	if err != nil {
 		return nil, err
 	}
@@ -123,15 +122,15 @@ func (mc *MysqlConn) CurrentDB() string {
 	return mc.db
 }
 
-func (mc *MysqlConn) Connect(addr string, user string, password string, db string) error {
+func (mc *MysqlConn) connect(addr string, user string, password string, db string) error {
 	mc.addr = addr
 	mc.user = user
 	mc.password = password
 	mc.db = db
-	return mc.ReConnect()
+	return mc.reConnect()
 }
 
-func (mc *MysqlConn) ReConnect() error {
+func (mc *MysqlConn) reConnect() error {
 	if mc.conn != nil {
 		mc.conn.Close()
 	}
@@ -156,14 +155,6 @@ func (mc *MysqlConn) ReConnect() error {
 	if err = mc.readOK(); err != nil {
 		mc.conn.Close()
 		return err
-	}
-	//we must always use autocommit
-	if !mc.IsAutoCommit() {
-		if _, err := mc.exec("set autocommit = 1"); err != nil {
-			mc.conn.Close()
-
-			return err
-		}
 	}
 
 	mc.lastPing = time.Now().Unix()
@@ -369,40 +360,6 @@ func (mc *MysqlConn) Execute(command string, args ...interface{}) (*ResultSet, e
 		command = interpolateParams(command, mc.status&SERVER_STATUS_NO_BACKSLASH_ESCAPED > 0, args...)
 	}
 	return mc.exec(command)
-}
-
-func (mc *MysqlConn) Begin() error {
-	_, err := mc.exec("begin")
-	return err
-}
-
-func (mc *MysqlConn) Commit() error {
-	_, err := mc.exec("commit")
-	return err
-}
-
-func (mc *MysqlConn) Rollback() error {
-	_, err := mc.exec("rollback")
-	return err
-}
-
-func (mc *MysqlConn) SetCharset(charset string) error {
-	charset = strings.Trim(charset, "\"'`")
-	if mc.charset == charset {
-		return nil
-	}
-
-	cid, ok := CharsetIds[charset]
-	if !ok {
-		return fmt.Errorf("invalid charset %s", charset)
-	}
-
-	if _, err := mc.exec(fmt.Sprintf("set names %s", charset)); err != nil {
-		return err
-	} else {
-		mc.collation = cid
-		return nil
-	}
 }
 
 func (mc *MysqlConn) FieldList(table string, wildcard string) ([]*ColumnInfo, error) {
@@ -644,18 +601,6 @@ func (mc *MysqlConn) readResult(binary bool) (*ResultSet, error) {
 	}
 
 	return mc.readResultSet(data, binary)
-}
-
-func (mc *MysqlConn) IsAutoCommit() bool {
-	return mc.status&SERVER_STATUS_AUTOCOMMIT > 0
-}
-
-func (mc *MysqlConn) IsInTransaction() bool {
-	return mc.status&SERVER_STATUS_IN_TRANS > 0
-}
-
-func (mc *MysqlConn) GetCharset() string {
-	return mc.charset
 }
 
 func (mc *MysqlConn) Prepare(query string) (stmt IStatement, columns, params []*ColumnInfo, err error) {
