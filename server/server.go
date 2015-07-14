@@ -9,11 +9,10 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
-	stats "github.com/ngaut/gostats"
 	"github.com/ngaut/log"
 	"github.com/ngaut/tokenlimiter"
 	"github.com/pingcap/mp/etc"
-	"github.com/pingcap/mp/protocol"
+	"github.com/pingcap/mysqldef"
 )
 
 var (
@@ -26,16 +25,7 @@ type Server struct {
 	listener          net.Listener
 	rwlock            *sync.RWMutex
 	concurrentLimiter *tokenlimiter.TokenLimiter
-	counter           *stats.Counters
 	clients           map[uint32]*ClientConn
-}
-
-func (s *Server) IncCounter(key string) {
-	s.counter.Add(key, 1)
-}
-
-func (s *Server) DecCounter(key string) {
-	s.counter.Add(key, -1)
 }
 
 func (s *Server) GetToken() *tokenlimiter.Token {
@@ -53,8 +43,8 @@ func (s *Server) newConn(conn net.Conn) (cc *ClientConn, err error) {
 		pkg:          NewPacketIO(conn),
 		server:       s,
 		connectionId: atomic.AddUint32(&baseConnId, 1),
-		collation:    protocol.DEFAULT_COLLATION_ID,
-		charset:      protocol.DEFAULT_CHARSET,
+		collation:    mysqldef.DEFAULT_COLLATION_ID,
+		charset:      mysqldef.DEFAULT_CHARSET,
 		alloc:        arena.NewArenaAllocator(32 * 1024),
 	}
 	cc.salt = make([]byte, 20)
@@ -85,7 +75,6 @@ func NewServer(cfg *etc.Config, driver IDriver) (*Server, error) {
 		cfg:               cfg,
 		driver:            driver,
 		concurrentLimiter: tokenlimiter.NewTokenLimiter(100),
-		counter:           stats.NewCounters(""),
 		rwlock:            &sync.RWMutex{},
 		clients:           make(map[uint32]*ClientConn),
 	}
@@ -144,9 +133,7 @@ func (s *Server) onConn(c net.Conn) {
 
 	const key = "connections"
 
-	s.IncCounter(key)
 	defer func() {
-		s.DecCounter(key)
 		log.Infof("close %s", conn)
 	}()
 

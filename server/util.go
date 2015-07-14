@@ -14,7 +14,7 @@ import (
 	"github.com/ngaut/arena"
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
-	. "github.com/pingcap/mp/protocol"
+	. "github.com/pingcap/mysqldef"
 )
 
 func parseLengthEncodedInt(b []byte) (num uint64, isNull bool, n int) {
@@ -172,7 +172,7 @@ func parseTextDateTime(timeStr string, mysqlType uint8, loc *time.Location) (t t
 		err = errors.New("illegal argument")
 		return
 	}
-	if mysqlType != MYSQL_TYPE_TIMESTAMP || loc == nil {
+	if mysqlType != MysqlTypeTimestamp || loc == nil {
 		loc = time.Local
 	}
 	t, err = time.ParseInLocation(timeFormat[:len(timeStr)], timeStr, loc)
@@ -180,10 +180,10 @@ func parseTextDateTime(timeStr string, mysqlType uint8, loc *time.Location) (t t
 }
 
 func dumpTextDateTime(t time.Time, mysqlType uint8, loc *time.Location) []byte {
-	if mysqlType == MYSQL_TYPE_TIMESTAMP && loc != nil {
+	if mysqlType == MysqlTypeTimestamp && loc != nil {
 		t = t.In(loc)
 	}
-	if mysqlType == MYSQL_TYPE_DATE {
+	if mysqlType == MysqlTypeDate {
 		return []byte(t.Format("2006-01-02"))
 	}
 	return []byte(t.Format(timeFormat))
@@ -285,7 +285,7 @@ func dumpBinaryTime(dur time.Duration) (data []byte) {
 
 // Mysql Timestamp type is time zone dependent, other date time types are not.
 func parseBinaryDateTime(num int, data []byte, mysqlType uint8, loc *time.Location) (t time.Time, err error) {
-	if loc == nil || mysqlType != MYSQL_TYPE_TIMESTAMP {
+	if loc == nil || mysqlType != MysqlTypeTimestamp {
 		loc = time.Local
 	}
 	switch num {
@@ -328,16 +328,16 @@ func parseBinaryDateTime(num int, data []byte, mysqlType uint8, loc *time.Locati
 }
 
 func dumpBinaryDateTime(t time.Time, mysqlType uint8, loc *time.Location) (data []byte) {
-	if mysqlType == MYSQL_TYPE_TIMESTAMP && loc != nil {
+	if mysqlType == MysqlTypeTimestamp && loc != nil {
 		t = t.In(loc)
 	}
 	switch mysqlType {
-	case MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_DATETIME:
+	case MysqlTypeTimestamp, MysqlTypeDatetime:
 		data = append(data, 11)
 		data = append(data, dumpUint16(uint16(t.Year()))...) //year
 		data = append(data, byte(t.Month()), byte(t.Day()), byte(t.Hour()), byte(t.Minute()), byte(t.Second()))
 		data = append(data, dumpUint32(uint32((t.Nanosecond() / 1000)))...)
-	case MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE:
+	case MysqlTypeDate, MysqlTypeNewDate:
 		data = append(data, 4)
 		data = append(data, dumpUint16(uint16(t.Year()))...) //year
 		data = append(data, byte(t.Month()), byte(t.Day()))
@@ -365,43 +365,43 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 		}
 
 		switch columns[i].Type {
-		case MYSQL_TYPE_NULL:
+		case MysqlTypeNull:
 			values[i] = nil
 			continue
 
-		case MYSQL_TYPE_TINY:
+		case MysqlTypeTiny:
 			values[i] = int64(rowData[pos])
 			pos++
 			continue
-		case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
+		case MysqlTypeShort, MysqlTypeYear:
 			values[i] = int64((binary.LittleEndian.Uint16(rowData[pos : pos+2])))
 			pos += 2
 			continue
 
-		case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+		case MysqlTypeInt24, MysqlTypeLong:
 			values[i] = int64(binary.LittleEndian.Uint32(rowData[pos : pos+4]))
 			pos += 4
 			continue
 
-		case MYSQL_TYPE_LONGLONG:
+		case MysqlTypeLonglong:
 			values[i] = int64(binary.LittleEndian.Uint64(rowData[pos : pos+8]))
 			pos += 8
 			continue
 
-		case MYSQL_TYPE_FLOAT:
+		case MysqlTypeFloat:
 			values[i] = float64(math.Float32frombits(binary.LittleEndian.Uint32(rowData[pos : pos+4])))
 			pos += 4
 			continue
 
-		case MYSQL_TYPE_DOUBLE:
+		case MysqlTypeDouble:
 			values[i] = math.Float64frombits(binary.LittleEndian.Uint64(rowData[pos : pos+8]))
 			pos += 8
 			continue
 
-		case MYSQL_TYPE_DECIMAL, MYSQL_TYPE_NEWDECIMAL, MYSQL_TYPE_VARCHAR,
-			MYSQL_TYPE_BIT, MYSQL_TYPE_ENUM, MYSQL_TYPE_SET, MYSQL_TYPE_TINY_BLOB,
-			MYSQL_TYPE_MEDIUM_BLOB, MYSQL_TYPE_LONG_BLOB, MYSQL_TYPE_BLOB,
-			MYSQL_TYPE_VAR_STRING, MYSQL_TYPE_STRING, MYSQL_TYPE_GEOMETRY:
+		case MysqlTypeDecimal, MysqlTypeNewDecimal, MysqlTypeVarchar,
+			MysqlTypeBit, MysqlTypeEnum, MysqlTypeSet, MysqlTypeTinyBlob,
+			MysqlTypeMediumBlob, MysqlTypeLongBlob, MysqlTypeBlob,
+			MysqlTypeVarString, MysqlTypeString, MysqlTypeGeometry:
 			v, isNull, n, err = parseLengthEncodedBytes(rowData[pos:])
 			pos += n
 			if err != nil {
@@ -415,7 +415,7 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 				values[i] = nil
 				continue
 			}
-		case MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE, MYSQL_TYPE_DATETIME, MYSQL_TYPE_TIMESTAMP:
+		case MysqlTypeDate, MysqlTypeNewDate, MysqlTypeDatetime, MysqlTypeTimestamp:
 			var num uint64
 			num, isNull, n = parseLengthEncodedInt(rowData[pos:])
 
@@ -432,7 +432,7 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 				return nil, err
 			}
 
-		case MYSQL_TYPE_TIME:
+		case MysqlTypeTime:
 			var num uint64
 			num, isNull, n = parseLengthEncodedInt(rowData[pos:])
 
@@ -476,24 +476,24 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 		switch v := val.(type) {
 		case int64:
 			switch columns[i].Type {
-			case MYSQL_TYPE_TINY:
+			case MysqlTypeTiny:
 				data = append(data, byte(v))
-			case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
+			case MysqlTypeShort, MysqlTypeYear:
 				data = append(data, dumpUint16(uint16(v))...)
-			case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+			case MysqlTypeInt24, MysqlTypeLong:
 				data = append(data, dumpUint32(uint32(v))...)
-			case MYSQL_TYPE_LONGLONG:
+			case MysqlTypeLonglong:
 				data = append(data, dumpUint64(uint64(v))...)
 			}
 		case uint64:
 			switch columns[i].Type {
-			case MYSQL_TYPE_TINY:
+			case MysqlTypeTiny:
 				data = append(data, byte(v))
-			case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
+			case MysqlTypeShort, MysqlTypeYear:
 				data = append(data, dumpUint16(uint16(v))...)
-			case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+			case MysqlTypeInt24, MysqlTypeLong:
 				data = append(data, dumpUint32(uint32(v))...)
-			case MYSQL_TYPE_LONGLONG:
+			case MysqlTypeLonglong:
 				data = append(data, dumpUint64(uint64(v))...)
 			}
 		case float32:
@@ -535,18 +535,18 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 			isUnsigned = (col.Flag&UNSIGNED_FLAG > 0)
 
 			switch col.Type {
-			case MYSQL_TYPE_TINY, MYSQL_TYPE_SHORT, MYSQL_TYPE_INT24,
-				MYSQL_TYPE_LONGLONG, MYSQL_TYPE_YEAR:
+			case MysqlTypeTiny, MysqlTypeShort, MysqlTypeInt24,
+				MysqlTypeLonglong, MysqlTypeYear:
 				if isUnsigned {
 					values[i], err = strconv.ParseUint(hack.String(v), 10, 64)
 				} else {
 					values[i], err = strconv.ParseInt(hack.String(v), 10, 64)
 				}
-			case MYSQL_TYPE_FLOAT, MYSQL_TYPE_DOUBLE:
+			case MysqlTypeFloat, MysqlTypeDouble:
 				values[i], err = strconv.ParseFloat(hack.String(v), 64)
-			case MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE, MYSQL_TYPE_DATETIME:
+			case MysqlTypeTimestamp, MysqlTypeDate, MysqlTypeNewDate, MysqlTypeDatetime:
 				values[i], err = parseTextDateTime(hack.String(v), col.Type, nil)
-			case MYSQL_TYPE_TIME:
+			case MysqlTypeTime:
 				values[i], err = parseTextTime(hack.String(v))
 			default:
 				values[i] = v

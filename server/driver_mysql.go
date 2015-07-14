@@ -9,7 +9,7 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/pingcap/mp/hack"
-	. "github.com/pingcap/mp/protocol"
+	. "github.com/pingcap/mysqldef"
 )
 
 type MysqlDriver struct{}
@@ -38,7 +38,7 @@ type MysqlConn struct {
 	affectedRows uint64
 	warningCount uint16
 
-	collation CollationId
+	collation byte
 	charset   string
 	salt      []byte
 
@@ -53,7 +53,7 @@ func (md *MysqlDriver) OpenCtx(capability uint32, collation uint8, dbname string
 	mc := new(MysqlConn)
 	mc.stmts = make(map[int]*MysqlStatement)
 	mc.capability = capability & DEFAULT_CAPABILITY
-	mc.collation = CollationId(collation)
+	mc.collation = collation
 	err = mc.connect(":3306", "root", "", dbname)
 	if err != nil {
 		return nil, err
