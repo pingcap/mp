@@ -158,11 +158,11 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 		isUnsigned := (paramTypes[(i<<1)+1] & 0x80) > 0
 
 		switch tp {
-		case MysqlTypeNull:
+		case TypeNull:
 			args[i] = nil
 			continue
 
-		case MysqlTypeTiny:
+		case TypeTiny:
 			if len(paramValues) < (pos + 1) {
 				err = ErrMalformPacket
 				return
@@ -177,7 +177,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos++
 			continue
 
-		case MysqlTypeShort, MysqlTypeYear:
+		case TypeShort, TypeYear:
 			if len(paramValues) < (pos + 2) {
 				err = ErrMalformPacket
 				return
@@ -191,7 +191,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 2
 			continue
 
-		case MysqlTypeInt24, MysqlTypeLong:
+		case TypeInt24, TypeLong:
 			if len(paramValues) < (pos + 4) {
 				err = ErrMalformPacket
 				return
@@ -205,7 +205,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 4
 			continue
 
-		case MysqlTypeLonglong:
+		case TypeLonglong:
 			if len(paramValues) < (pos + 8) {
 				err = ErrMalformPacket
 				return
@@ -219,7 +219,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 8
 			continue
 
-		case MysqlTypeFloat:
+		case TypeFloat:
 			if len(paramValues) < (pos + 4) {
 				err = ErrMalformPacket
 				return
@@ -229,7 +229,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 4
 			continue
 
-		case MysqlTypeDouble:
+		case TypeDouble:
 			if len(paramValues) < (pos + 8) {
 				err = ErrMalformPacket
 				return
@@ -239,12 +239,12 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 8
 			continue
 
-		case MysqlTypeDecimal, MysqlTypeNewDecimal, MysqlTypeVarchar,
-			MysqlTypeBit, MysqlTypeEnum, MysqlTypeSet, MysqlTypeTinyBlob,
-			MysqlTypeMediumBlob, MysqlTypeLongBlob, MysqlTypeBlob,
-			MysqlTypeVarString, MysqlTypeString, MysqlTypeGeometry,
-			MysqlTypeDate, MysqlTypeNewDate,
-			MysqlTypeTimestamp, MysqlTypeDatetime, MysqlTypeTime:
+		case TypeDecimal, TypeNewDecimal, TypeVarchar,
+			TypeBit, TypeEnum, TypeSet, TypeTinyBlob,
+			TypeMediumBlob, TypeLongBlob, TypeBlob,
+			TypeVarString, TypeString, TypeGeometry,
+			TypeDate, TypeNewDate,
+			TypeTimestamp, TypeDatetime, TypeTime:
 			if len(paramValues) < (pos + 1) {
 				err = ErrMalformPacket
 				return
