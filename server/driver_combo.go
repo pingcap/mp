@@ -116,10 +116,11 @@ func (cd *ComboDriver) OpenCtx(capability uint32, collation uint8, dbname string
 	if err != nil {
 		return nil, err
 	}
-	comCtx := new(ComboContext)
-	comCtx.mc = mc
-	comCtx.qc = qc
-	comCtx.useQlResult = cd.UseQlResult
+	comCtx := &ComboContext{
+		mc:          mc,
+		qc:          qc,
+		useQlResult: cd.UseQlResult,
+	}
 	return comCtx, nil
 }
 
