@@ -13,6 +13,13 @@ import (
 	"github.com/pingcap/mp/server"
 )
 
+func env(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -24,9 +31,20 @@ func main() {
 	}
 
 	log.SetLevelByString(cfg.LogLevel)
-
+	server.CreateQlTestDatabase()
 	var svr *server.Server
-	svr, err := server.NewServer(cfg, &server.QlDriver{})
+	var driver server.IDriver
+	switch env("MP_DRIVER", "comboql") {
+	case "ql":
+		driver = &server.QlDriver{}
+	case "mysql":
+		driver = &server.MysqlDriver{}
+	case "comboql":
+		driver = server.NewComboDriver(true)
+	case "combo":
+		driver = server.NewComboDriver(false)
+	}
+	svr, err := server.NewServer(cfg, driver)
 	if err != nil {
 		log.Error(err.Error())
 		return

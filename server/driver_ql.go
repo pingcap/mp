@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/ngaut/log"
 	. "github.com/pingcap/mp/protocol"
 	"github.com/pingcap/ql"
 	"github.com/pingcap/ql/field"
@@ -49,7 +50,7 @@ func (qc *QlContext) WarningCount() uint16 {
 }
 
 func (qc *QlContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
-	qrsList, err := qc.session.Execute(sql, args...)
+	qrsList, err := qc.session.Execute(interpolateParams(sql, qc.session.Status()&SERVER_STATUS_NO_BACKSLASH_ESCAPED > 0, args...))
 	if err != nil {
 		return
 	}
@@ -96,25 +97,6 @@ func (qc *QlContext) Prepare(sql string) (statement IStatement, columns, params 
 	return
 }
 
-var qlTypeMap = map[string]byte{
-	"bigint":   MYSQL_TYPE_LONGLONG,
-	"blob":     MYSQL_TYPE_BLOB,
-	"bool":     MYSQL_TYPE_TINY,
-	"duration": MYSQL_TYPE_LONGLONG, //TODO change to proper type
-	"float32":  MYSQL_TYPE_FLOAT,
-	"float64":  MYSQL_TYPE_DOUBLE,
-	"int16":    MYSQL_TYPE_SHORT,
-	"int32":    MYSQL_TYPE_LONG,
-	"int64":    MYSQL_TYPE_LONGLONG,
-	"int8":     MYSQL_TYPE_TINY,
-	"string":   MYSQL_TYPE_VARCHAR,
-	"time":     MYSQL_TYPE_DATETIME,
-	"uint16":   MYSQL_TYPE_SHORT,
-	"uint32":   MYSQL_TYPE_LONG,
-	"uint64":   MYSQL_TYPE_LONGLONG,
-	"uint8":    MYSQL_TYPE_TINY,
-}
-
 func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	ci = new(ColumnInfo)
 	ci.Schema = qlfield.DBName
@@ -123,6 +105,17 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	ci.Table = qlfield.TableName
 	ci.Charset = uint16(CharsetIds[qlfield.Charset])
 	ci.ColumnLength = uint32(qlfield.Flen)
-	ci.Type = qlTypeMap[qlfield.TypeStr]
+	ci.Type = uint8(qlfield.Tp)
 	return
+}
+
+func CreateQlTestDatabase() {
+	qd := &QlDriver{}
+	qc, err := qd.OpenCtx(DEFAULT_CAPABILITY, DEFAULT_COLLATION_ID, "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	qc.Execute("CREATE DATABASE IF NOT EXISTS test")
+	qc.Execute("CREATE DATABASE IF NOT EXISTS gotest")
+	qc.Close()
 }
