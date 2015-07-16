@@ -57,7 +57,7 @@ func (d *Compare) String() string {
 		}
 		if !reflect.DeepEqual(d.rset[0].Rows, d.rset[1].Rows) {
 			s += fmt.Sprintf("expect %v\n", d.rset[0].Rows)
-			s += fmt.Sprintf("got %v\n")
+			s += fmt.Sprintf("got %v\n", d.rset[1].Rows)
 		}
 	}
 	if d.err[0] == nil && d.err[1] != nil {

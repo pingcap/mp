@@ -548,6 +548,14 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 				values[i], err = parseTextDateTime(hack.String(v), col.Type, nil)
 			case TypeTime:
 				values[i], err = parseTextTime(hack.String(v))
+			case TypeString, TypeVarString, TypeVarchar:
+				values[i] = hack.String(v)
+			case TypeBlob, TypeLongBlob, TypeMediumBlob, TypeTinyBlob:
+				if col.Charset != uint16(CharsetIds["binary"]) {
+					values[i] = hack.String(v)
+				} else {
+					values[i] = v
+				}
 			default:
 				values[i] = v
 			}
