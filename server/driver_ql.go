@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/cockroachdb/cockroach/util/log"
+	"github.com/ngaut/log"
 	. "github.com/pingcap/mysqldef"
 	"github.com/pingcap/ql"
 	"github.com/pingcap/ql/field"
@@ -111,7 +111,7 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 
 func CreateQlTestDatabase() {
 	qd := &QlDriver{}
-	qc, err := qd.OpenCtx(DEFAULT_CAPABILITY, 33, "")
+	qc, err := qd.OpenCtx(DEFAULT_CAPABILITY, DEFAULT_COLLATION_ID, "")
 	if err != nil {
 		log.Fatal(err)
 	}

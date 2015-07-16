@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/juju/errors"
 	"github.com/pingcap/mp/hack"
@@ -41,8 +40,6 @@ type MysqlConn struct {
 	collation byte
 	charset   string
 	salt      []byte
-
-	lastPing int64
 
 	pkgErr error
 
@@ -127,14 +124,6 @@ func (mc *MysqlConn) connect(addr string, user string, password string, db strin
 	mc.user = user
 	mc.password = password
 	mc.db = db
-	return mc.reConnect()
-}
-
-func (mc *MysqlConn) reConnect() error {
-	if mc.conn != nil {
-		mc.conn.Close()
-	}
-
 	netConn, err := net.Dial("tcp", mc.addr)
 	if err != nil {
 		return err
@@ -156,8 +145,6 @@ func (mc *MysqlConn) reConnect() error {
 		mc.conn.Close()
 		return err
 	}
-
-	mc.lastPing = time.Now().Unix()
 
 	return nil
 }
