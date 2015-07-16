@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/cockroachdb/cockroach/util/log"
+	"github.com/ngaut/log"
 	. "github.com/pingcap/mp/protocol"
 	"github.com/pingcap/ql"
 	"github.com/pingcap/ql/field"
@@ -97,25 +97,6 @@ func (qc *QlContext) Prepare(sql string) (statement IStatement, columns, params 
 	return
 }
 
-var qlTypeMap = map[string]byte{
-	"bigint":   MYSQL_TYPE_LONGLONG,
-	"blob":     MYSQL_TYPE_BLOB,
-	"bool":     MYSQL_TYPE_TINY,
-	"duration": MYSQL_TYPE_LONGLONG, //TODO change to proper type
-	"float32":  MYSQL_TYPE_FLOAT,
-	"float64":  MYSQL_TYPE_DOUBLE,
-	"int16":    MYSQL_TYPE_SHORT,
-	"int32":    MYSQL_TYPE_LONG,
-	"int64":    MYSQL_TYPE_LONGLONG,
-	"int8":     MYSQL_TYPE_TINY,
-	"string":   MYSQL_TYPE_VARCHAR,
-	"time":     MYSQL_TYPE_DATETIME,
-	"uint16":   MYSQL_TYPE_SHORT,
-	"uint32":   MYSQL_TYPE_LONG,
-	"uint64":   MYSQL_TYPE_LONGLONG,
-	"uint8":    MYSQL_TYPE_TINY,
-}
-
 func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	ci = new(ColumnInfo)
 	ci.Schema = qlfield.DBName
@@ -124,13 +105,13 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	ci.Table = qlfield.TableName
 	ci.Charset = uint16(CharsetIds[qlfield.Charset])
 	ci.ColumnLength = uint32(qlfield.Flen)
-	ci.Type = qlTypeMap[qlfield.TypeStr]
+	ci.Type = uint8(qlfield.Tp)
 	return
 }
 
 func CreateQlTestDatabase() {
 	qd := &QlDriver{}
-	qc, err := qd.OpenCtx(DEFAULT_CAPABILITY, 33, "")
+	qc, err := qd.OpenCtx(DEFAULT_CAPABILITY, DEFAULT_COLLATION_ID, "")
 	if err != nil {
 		log.Fatal(err)
 	}
