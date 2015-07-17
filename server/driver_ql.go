@@ -99,7 +99,7 @@ func (qc *QlContext) Prepare(sql string) (statement IStatement, columns, params 
 
 func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	ci = new(ColumnInfo)
-	ci.Schema = qlfield.DBName
+	ci.Schema = ""
 	ci.Flag = uint16(qlfield.Flag)
 	ci.Name = qlfield.Name
 	ci.Table = qlfield.TableName
