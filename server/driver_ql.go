@@ -50,7 +50,7 @@ func (qc *QlContext) WarningCount() uint16 {
 }
 
 func (qc *QlContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
-	qrsList, err := qc.session.Execute(interpolateParams(sql, qc.session.Status()&SERVER_STATUS_NO_BACKSLASH_ESCAPED > 0, args...))
+	qrsList, err := qc.session.Execute(interpolateParams(sql, qc.session.Status()&ServerStatusNoBackslashEscaped > 0, args...))
 	if err != nil {
 		return
 	}
@@ -111,7 +111,7 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 
 func CreateQlTestDatabase() {
 	qd := &QlDriver{}
-	qc, err := qd.OpenCtx(DEFAULT_CAPABILITY, DEFAULT_COLLATION_ID, "")
+	qc, err := qd.OpenCtx(DefaultCapability, DefaultCollationID, "")
 	if err != nil {
 		log.Fatal(err)
 	}

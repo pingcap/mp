@@ -347,7 +347,7 @@ func dumpBinaryDateTime(t time.Time, mysqlType uint8, loc *time.Location) (data 
 
 func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{}, error) {
 	values := make([]interface{}, len(columns))
-	if rowData[0] != OK_HEADER {
+	if rowData[0] != OKHeader {
 		return nil, ErrMalformPacket
 	}
 
@@ -461,7 +461,7 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 		err = ErrMalformPacket
 		return
 	}
-	data = append(data, OK_HEADER)
+	data = append(data, OKHeader)
 	nullsLen := ((len(columns) + 7 + 2) / 8)
 	nulls := make([]byte, nullsLen)
 	for i, val := range row {

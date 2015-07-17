@@ -43,8 +43,8 @@ func (s *Server) newConn(conn net.Conn) (cc *ClientConn, err error) {
 		pkg:          NewPacketIO(conn),
 		server:       s,
 		connectionId: atomic.AddUint32(&baseConnId, 1),
-		collation:    mysqldef.DEFAULT_COLLATION_ID,
-		charset:      mysqldef.DEFAULT_CHARSET,
+		collation:    mysqldef.DefaultCollationID,
+		charset:      mysqldef.DefaultCharset,
 		alloc:        arena.NewArenaAllocator(32 * 1024),
 	}
 	cc.salt = make([]byte, 20)
