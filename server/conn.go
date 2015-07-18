@@ -13,13 +13,13 @@ import (
 	"github.com/ngaut/arena"
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
-	"github.com/pingcap/mp/protocol"
+	. "github.com/pingcap/mysqldef"
 	"github.com/reborndb/go/errors2"
 )
 
-var DEFAULT_CAPABILITY uint32 = protocol.CLIENT_LONG_PASSWORD | protocol.CLIENT_LONG_FLAG |
-	protocol.CLIENT_CONNECT_WITH_DB | protocol.CLIENT_PROTOCOL_41 |
-	protocol.CLIENT_TRANSACTIONS | protocol.CLIENT_SECURE_CONNECTION | protocol.CLIENT_FOUND_ROWS
+var DefaultCapability uint32 = ClientLongPassword | ClientLongFlag |
+	ClientConnectWithDB | ClientProtocol41 |
+	ClientTransactions | ClientSecureConnection | ClientFoundRows
 
 type ClientConn struct {
 	pkg          *PacketIO
@@ -27,7 +27,7 @@ type ClientConn struct {
 	server       *Server
 	capability   uint32
 	connectionId uint32
-	collation    protocol.CollationId
+	collation    uint8
 	charset      string
 	user         string
 	dbname       string
@@ -52,10 +52,10 @@ func (cc *ClientConn) Handshake() error {
 		return errors.Trace(err)
 	}
 	data := cc.alloc.AllocBytesWithLen(4, 32)
-	data = append(data, protocol.OK_HEADER)
+	data = append(data, OKHeader)
 	data = append(data, 0, 0)
-	if cc.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
-		data = append(data, dumpUint16(protocol.SERVER_STATUS_AUTOCOMMIT)...)
+	if cc.capability&ClientProtocol41 > 0 {
+		data = append(data, dumpUint16(ServerStatusAutocommit)...)
 		data = append(data, 0, 0)
 	}
 
@@ -79,7 +79,7 @@ func (cc *ClientConn) writeInitialHandshake() error {
 	//min version 10
 	data = append(data, 10)
 	//server version[00]
-	data = append(data, protocol.ServerVersion...)
+	data = append(data, ServerVersion...)
 	data = append(data, 0)
 	//connection id
 	data = append(data, byte(cc.connectionId), byte(cc.connectionId>>8), byte(cc.connectionId>>16), byte(cc.connectionId>>24))
@@ -88,14 +88,14 @@ func (cc *ClientConn) writeInitialHandshake() error {
 	//filter [00]
 	data = append(data, 0)
 	//capability flag lower 2 bytes, using default capability here
-	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
+	data = append(data, byte(DefaultCapability), byte(DefaultCapability>>8))
 	//charset, utf-8 default
-	data = append(data, uint8(protocol.DEFAULT_COLLATION_ID))
+	data = append(data, uint8(DefaultCollationID))
 	//status
-	data = append(data, dumpUint16(protocol.SERVER_STATUS_AUTOCOMMIT)...)
+	data = append(data, dumpUint16(ServerStatusAutocommit)...)
 	//below 13 byte may not be used
 	//capability flag upper 2 bytes, using default capability here
-	data = append(data, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
+	data = append(data, byte(DefaultCapability>>16), byte(DefaultCapability>>24))
 	//filter [0x15], for wireshark dump, value is 0x15
 	data = append(data, 0x15)
 	//reserved 10 [00]
@@ -162,7 +162,7 @@ func (cc *ClientConn) readHandshakeResponse() error {
 	//skip max packet size
 	pos += 4
 	//charset, skip, if you want to use another charset, use set names
-	cc.collation = protocol.CollationId(data[pos])
+	cc.collation = data[pos]
 	pos++
 	//skip reserved 23[00]
 	pos += 23
@@ -175,11 +175,11 @@ func (cc *ClientConn) readHandshakeResponse() error {
 	auth := data[pos : pos+authLen]
 	checkAuth := calcPassword(cc.salt, []byte(cc.server.CfgGetPwd(cc.user)))
 	if !bytes.Equal(auth, checkAuth) && !cc.server.SkipAuth() {
-		return errors.Trace(protocol.NewDefaultError(protocol.ER_ACCESS_DENIED_ERROR, cc.conn.RemoteAddr().String(), cc.user, "Yes"))
+		return errors.Trace(NewDefaultError(ER_ACCESS_DENIED_ERROR, cc.conn.RemoteAddr().String(), cc.user, "Yes"))
 	}
 
 	pos += authLen
-	if cc.capability|protocol.CLIENT_CONNECT_WITH_DB > 0 {
+	if cc.capability|ClientConnectWithDB > 0 {
 		if len(data[pos:]) == 0 {
 			return nil
 		}
@@ -217,7 +217,7 @@ func (cc *ClientConn) Run() {
 
 		if err := cc.dispatch(data); err != nil {
 			log.Errorf("dispatch error %s, %s", errors.ErrorStack(err), cc)
-			if err != protocol.ErrBadConn { //todo: fix this
+			if err != ErrBadConn { //todo: fix this
 				cc.writeError(err)
 			}
 		}
@@ -244,39 +244,37 @@ func (cc *ClientConn) dispatch(data []byte) error {
 		cc.server.ReleaseToken(token)
 	}()
 
-	cc.server.IncCounter(protocol.MYSQL_COMMAND(cmd).String())
-
-	switch protocol.MYSQL_COMMAND(cmd) {
-	case protocol.COM_QUIT:
+	switch cmd {
+	case ComQuit:
 		cc.ctx.Close()
 		cc.Close()
 		return nil
-	case protocol.COM_QUERY:
+	case ComQuery:
 		return cc.handleQuery(hack.String(data))
-	case protocol.COM_PING:
+	case ComPing:
 		return cc.writeOK()
-	case protocol.COM_INIT_DB:
+	case ComInitDB:
 		log.Debug("init db", hack.String(data))
 		if err := cc.useDB(hack.String(data)); err != nil {
 			return errors.Trace(err)
 		}
 
 		return cc.writeOK()
-	case protocol.COM_FIELD_LIST:
+	case ComFieldList:
 		return cc.handleFieldList(hack.String(data))
-	case protocol.COM_STMT_PREPARE:
+	case ComStmtPrepare:
 		return cc.handleStmtPrepare(hack.String(data))
-	case protocol.COM_STMT_EXECUTE:
+	case ComStmtExecute:
 		return cc.handleStmtExecute(data)
-	case protocol.COM_STMT_CLOSE:
+	case ComStmtClose:
 		return cc.handleStmtClose(data)
-	case protocol.COM_STMT_SEND_LONG_DATA:
+	case ComStmtSendLongData:
 		return cc.handleStmtSendLongData(data)
-	case protocol.COM_STMT_RESET:
+	case ComStmtReset:
 		return cc.handleStmtReset(data)
 	default:
 		msg := fmt.Sprintf("command %d not supported now", cmd)
-		return protocol.NewError(protocol.ER_UNKNOWN_ERROR, msg)
+		return NewError(ER_UNKNOWN_ERROR, msg)
 	}
 
 	return nil
@@ -297,10 +295,10 @@ func (cc *ClientConn) flush() error {
 
 func (cc *ClientConn) writeOK() error {
 	data := cc.alloc.AllocBytesWithLen(4, 32)
-	data = append(data, protocol.OK_HEADER)
+	data = append(data, OKHeader)
 	data = append(data, dumpLengthEncodedInt(uint64(cc.ctx.AffectedRows()))...)
 	data = append(data, dumpLengthEncodedInt(uint64(cc.ctx.LastInsertID()))...)
-	if cc.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
+	if cc.capability&ClientProtocol41 > 0 {
 		data = append(data, dumpUint16(cc.ctx.Status())...)
 		data = append(data, dumpUint16(cc.ctx.WarningCount())...)
 	}
@@ -314,16 +312,16 @@ func (cc *ClientConn) writeOK() error {
 }
 
 func (cc *ClientConn) writeError(e error) error {
-	var m *protocol.SqlError
+	var m *SqlError
 	var ok bool
-	if m, ok = e.(*protocol.SqlError); !ok {
-		m = protocol.NewError(protocol.ER_UNKNOWN_ERROR, e.Error())
+	if m, ok = e.(*SqlError); !ok {
+		m = NewError(ER_UNKNOWN_ERROR, e.Error())
 	}
 
 	data := make([]byte, 4, 16+len(m.Message))
-	data = append(data, protocol.ERR_HEADER)
+	data = append(data, ErrHeader)
 	data = append(data, byte(m.Code), byte(m.Code>>8))
-	if cc.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
+	if cc.capability&ClientProtocol41 > 0 {
 		data = append(data, '#')
 		data = append(data, m.State...)
 	}
@@ -340,8 +338,8 @@ func (cc *ClientConn) writeError(e error) error {
 func (cc *ClientConn) writeEOF() error {
 	data := cc.alloc.AllocBytesWithLen(4, 9)
 
-	data = append(data, protocol.EOF_HEADER)
-	if cc.capability&protocol.CLIENT_PROTOCOL_41 > 0 {
+	data = append(data, EOFHeader)
+	if cc.capability&ClientProtocol41 > 0 {
 		data = append(data, dumpUint16(cc.ctx.WarningCount())...)
 		data = append(data, dumpUint16(cc.ctx.Status())...)
 	}
@@ -356,11 +354,11 @@ func (cc *ClientConn) handleQuery(sql string) (err error) {
 		return errors.Trace(err)
 	}
 	if rs != nil {
-		cc.writeResultset(rs, false)
+		err = cc.writeResultset(rs, false)
 	} else {
-		cc.writeOK()
+		err = cc.writeOK()
 	}
-	return
+	return errors.Trace(err)
 }
 
 func (cc *ClientConn) handleFieldList(sql string) (err error) {

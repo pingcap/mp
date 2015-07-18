@@ -10,7 +10,7 @@ import (
 
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
-	. "github.com/pingcap/mp/protocol"
+	. "github.com/pingcap/mysqldef"
 )
 
 func (cc *ClientConn) handleStmtPrepare(sql string) error {
@@ -158,11 +158,11 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 		isUnsigned := (paramTypes[(i<<1)+1] & 0x80) > 0
 
 		switch tp {
-		case MYSQL_TYPE_NULL:
+		case TypeNull:
 			args[i] = nil
 			continue
 
-		case MYSQL_TYPE_TINY:
+		case TypeTiny:
 			if len(paramValues) < (pos + 1) {
 				err = ErrMalformPacket
 				return
@@ -177,7 +177,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos++
 			continue
 
-		case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
+		case TypeShort, TypeYear:
 			if len(paramValues) < (pos + 2) {
 				err = ErrMalformPacket
 				return
@@ -191,7 +191,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 2
 			continue
 
-		case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+		case TypeInt24, TypeLong:
 			if len(paramValues) < (pos + 4) {
 				err = ErrMalformPacket
 				return
@@ -205,7 +205,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 4
 			continue
 
-		case MYSQL_TYPE_LONGLONG:
+		case TypeLonglong:
 			if len(paramValues) < (pos + 8) {
 				err = ErrMalformPacket
 				return
@@ -219,7 +219,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 8
 			continue
 
-		case MYSQL_TYPE_FLOAT:
+		case TypeFloat:
 			if len(paramValues) < (pos + 4) {
 				err = ErrMalformPacket
 				return
@@ -229,7 +229,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 4
 			continue
 
-		case MYSQL_TYPE_DOUBLE:
+		case TypeDouble:
 			if len(paramValues) < (pos + 8) {
 				err = ErrMalformPacket
 				return
@@ -239,12 +239,12 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			pos += 8
 			continue
 
-		case MYSQL_TYPE_DECIMAL, MYSQL_TYPE_NEWDECIMAL, MYSQL_TYPE_VARCHAR,
-			MYSQL_TYPE_BIT, MYSQL_TYPE_ENUM, MYSQL_TYPE_SET, MYSQL_TYPE_TINY_BLOB,
-			MYSQL_TYPE_MEDIUM_BLOB, MYSQL_TYPE_LONG_BLOB, MYSQL_TYPE_BLOB,
-			MYSQL_TYPE_VAR_STRING, MYSQL_TYPE_STRING, MYSQL_TYPE_GEOMETRY,
-			MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE,
-			MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_DATETIME, MYSQL_TYPE_TIME:
+		case TypeDecimal, TypeNewDecimal, TypeVarchar,
+			TypeBit, TypeEnum, TypeSet, TypeTinyBlob,
+			TypeMediumBlob, TypeLongBlob, TypeBlob,
+			TypeVarString, TypeString, TypeGeometry,
+			TypeDate, TypeNewDate,
+			TypeTimestamp, TypeDatetime, TypeTime:
 			if len(paramValues) < (pos + 1) {
 				err = ErrMalformPacket
 				return

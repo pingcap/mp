@@ -15,6 +15,7 @@ type QLTestSuite struct {
 var _ = Suite(new(QLTestSuite))
 
 func (ts *QLTestSuite) SetUpSuite(c *C) {
+	CreateQlTestDatabase()
 	ts.qldrv = &QlDriver{}
 	cfg := &etc.Config{
 		Addr:     ":4000",
@@ -22,10 +23,6 @@ func (ts *QLTestSuite) SetUpSuite(c *C) {
 		Password: "",
 		LogLevel: "debug",
 	}
-	ctx, _ := ts.qldrv.OpenCtx(DEFAULT_CAPABILITY, 33, "")
-	_, err := ctx.Execute("CREATE DATABASE IF NOT EXISTS test")
-	c.Assert(err, IsNil)
-	ctx.Close()
 	server, err := NewServer(cfg, ts.qldrv)
 	c.Assert(err, IsNil)
 	ts.server = server
