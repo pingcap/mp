@@ -7,43 +7,43 @@ import (
 	. "gopkg.in/check.v1"
 )
 
-type QLTestSuite struct {
-	qldrv  *QlDriver
-	server *Server
+type TidbTestSuite struct {
+	tidbdrv *TidbDriver
+	server  *Server
 }
 
-var _ = Suite(new(QLTestSuite))
+var _ = Suite(new(TidbTestSuite))
 
-func (ts *QLTestSuite) SetUpSuite(c *C) {
+func (ts *TidbTestSuite) SetUpSuite(c *C) {
 	CreateQlTestDatabase()
-	ts.qldrv = &QlDriver{}
+	ts.tidbdrv = &TidbDriver{}
 	cfg := &etc.Config{
 		Addr:     ":4000",
 		User:     "root",
 		Password: "",
 		LogLevel: "debug",
 	}
-	server, err := NewServer(cfg, ts.qldrv)
+	server, err := NewServer(cfg, ts.tidbdrv)
 	c.Assert(err, IsNil)
 	ts.server = server
 	go ts.server.Run()
 	time.Sleep(time.Millisecond * 100)
 }
 
-func (ts *QLTestSuite) TearDownSuite(c *C) {
+func (ts *TidbTestSuite) TearDownSuite(c *C) {
 	ts.server.Close()
 }
 
-func (ts *QLTestSuite) TestRegression(c *C) {
+func (ts *TidbTestSuite) TestRegression(c *C) {
 	if regression {
 		runTestRegression(c)
 	}
 }
 
-func (ts *QLTestSuite) TestIssue1(c *C) {
+func (ts *TidbTestSuite) TestIssue1(c *C) {
 	runTestIssue1(c)
 }
 
-func (ts *QLTestSuite) TestIssue2(c *C) {
+func (ts *TidbTestSuite) TestIssue2(c *C) {
 	runTestIssue2(c)
 }

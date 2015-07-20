@@ -9,7 +9,7 @@ import (
 )
 
 type ComboDriver struct {
-	UseQlResult bool // if true use the result from ql, otherwise the result from mysql will be used.
+	UseTidbResult bool // if true use the result from ql, otherwise the result from mysql will be used.
 }
 
 type ResultDesc struct {
@@ -35,15 +35,15 @@ func (d *Compare) String() string {
 		return s
 	} else if d.rset[0] != nil {
 		mysqlRset := d.rset[0]
-		qlRset := d.rset[1]
-		if len(mysqlRset.Columns) != len(qlRset.Columns) {
-			s += fmt.Sprintf("expect columns count %d, got %d\n", len(mysqlRset.Columns), len(qlRset.Columns))
+		tidbRset := d.rset[1]
+		if len(mysqlRset.Columns) != len(tidbRset.Columns) {
+			s += fmt.Sprintf("expect columns count %d, got %d\n", len(mysqlRset.Columns), len(tidbRset.Columns))
 			return s
 		}
 
 		for i, v := range mysqlRset.Columns {
 			mtype := mysqlRset.Columns[i].Type
-			qType := qlRset.Columns[i].Type
+			qType := tidbRset.Columns[i].Type
 			if mtype != qType {
 				s += fmt.Sprintf("expect column %s type %d, got %d\n", v.Name, mtype, qType)
 				return s
@@ -51,8 +51,8 @@ func (d *Compare) String() string {
 			//TODO compare more column info
 		}
 
-		if len(mysqlRset.Rows) != len(qlRset.Rows) {
-			s += fmt.Sprintf("expect rows count %d, got %d\n", len(mysqlRset.Rows), len(qlRset.Rows))
+		if len(mysqlRset.Rows) != len(tidbRset.Rows) {
+			s += fmt.Sprintf("expect rows count %d, got %d\n", len(mysqlRset.Rows), len(tidbRset.Rows))
 			return s
 		}
 		if !reflect.DeepEqual(d.rset[0].Rows, d.rset[1].Rows) {
@@ -92,16 +92,16 @@ func (d *Compare) String() string {
 	return "" // no diffierence return empty string
 }
 
-//Combo context will send request to both mysql and ql, then compare the results
+//Combo context will send request to both mysql and tidb, then compare the results
 type ComboContext struct {
-	useQlResult bool
-	mc          IContext
-	qc          IContext
+	useTidbResult bool
+	mc            IContext
+	tc            IContext
 }
 
 func NewComboDriver(useQlResult bool) *ComboDriver {
 	return &ComboDriver{
-		UseQlResult: useQlResult,
+		UseTidbResult: useQlResult,
 	}
 }
 
@@ -111,83 +111,83 @@ func (cd *ComboDriver) OpenCtx(capability uint32, collation uint8, dbname string
 	if err != nil {
 		return nil, err
 	}
-	qd := &QlDriver{}
-	qc, err := qd.OpenCtx(capability, collation, dbname)
+	td := &TidbDriver{}
+	tc, err := td.OpenCtx(capability, collation, dbname)
 	if err != nil {
 		return nil, err
 	}
 	comCtx := &ComboContext{
-		mc:          mc,
-		qc:          qc,
-		useQlResult: cd.UseQlResult,
+		mc:            mc,
+		tc:            tc,
+		useTidbResult: cd.UseTidbResult,
 	}
 	return comCtx, nil
 }
 
 func (cc *ComboContext) Status() uint16 {
-	if cc.useQlResult {
-		return cc.qc.Status()
+	if cc.useTidbResult {
+		return cc.tc.Status()
 	}
 	return cc.mc.Status()
 }
 
 func (cc *ComboContext) LastInsertID() uint64 {
-	if cc.useQlResult {
-		return cc.qc.LastInsertID()
+	if cc.useTidbResult {
+		return cc.tc.LastInsertID()
 	}
 	return cc.mc.LastInsertID()
 }
 
 func (cc *ComboContext) AffectedRows() uint64 {
-	if cc.useQlResult {
-		return cc.qc.AffectedRows()
+	if cc.useTidbResult {
+		return cc.tc.AffectedRows()
 	}
 	return cc.mc.AffectedRows()
 }
 
 func (cc *ComboContext) CurrentDB() string {
-	if cc.useQlResult {
-		return cc.qc.CurrentDB()
+	if cc.useTidbResult {
+		return cc.tc.CurrentDB()
 	}
 	return cc.mc.CurrentDB()
 }
 
 func (cc *ComboContext) WarningCount() uint16 {
-	if cc.useQlResult {
-		return cc.qc.WarningCount()
+	if cc.useTidbResult {
+		return cc.tc.WarningCount()
 	}
 	return cc.mc.WarningCount()
 }
 
 func (cc *ComboContext) Close() error {
 	cc.mc.Close()
-	cc.qc.Close()
+	cc.tc.Close()
 	return nil
 }
 
 func (cc *ComboContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
 	mrs, merr := cc.mc.Execute(sql, args...)
-	qrs, qerr := cc.qc.Execute(sql, args...)
+	trs, terr := cc.tc.Execute(sql, args...)
 	comp := new(Compare)
 	comp.sql = sql
 	comp.rset[0] = mrs
-	comp.rset[1] = qrs
+	comp.rset[1] = trs
 	comp.affectedRows[0] = cc.mc.AffectedRows()
-	comp.affectedRows[1] = cc.qc.AffectedRows()
+	comp.affectedRows[1] = cc.tc.AffectedRows()
 	comp.lastInsertID[0] = cc.mc.LastInsertID()
-	comp.lastInsertID[1] = cc.qc.LastInsertID()
+	comp.lastInsertID[1] = cc.tc.LastInsertID()
 	comp.status[0] = cc.mc.Status()
-	comp.status[1] = cc.qc.Status()
+	comp.status[1] = cc.tc.Status()
 	comp.warningCount[0] = cc.mc.WarningCount()
-	comp.warningCount[1] = cc.qc.WarningCount()
+	comp.warningCount[1] = cc.tc.WarningCount()
 	comp.err[0] = merr
-	comp.err[1] = qerr
+	comp.err[1] = terr
 	compStr := comp.String()
 	if compStr != "" {
 		log.Warning(compStr)
 	}
-	if cc.useQlResult {
-		return qrs, qerr
+	if cc.useTidbResult {
+		return trs, terr
 	}
 	return mrs, merr
 }
