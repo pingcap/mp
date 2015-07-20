@@ -3,54 +3,54 @@ package server
 import (
 	"github.com/ngaut/log"
 	. "github.com/pingcap/mysqldef"
-	"github.com/pingcap/ql"
-	"github.com/pingcap/ql/field"
+	"github.com/pingcap/tidb"
+	"github.com/pingcap/tidb/field"
 )
 
-type QlDriver struct{}
+type TidbDriver struct{}
 
-type QlContext struct {
-	session      ql.Session
+type TidbContext struct {
+	session      tidb.Session
 	currentDB    string
 	warningCount uint16
 }
 
-type QlStatment struct {
+type TidbStatement struct {
 }
 
-func (qd *QlDriver) OpenCtx(capability uint32, collation uint8, dbname string) (IContext, error) {
-	session, _ := ql.CreateSession()
+func (qd *TidbDriver) OpenCtx(capability uint32, collation uint8, dbname string) (IContext, error) {
+	session, _ := tidb.CreateSession()
 	if dbname != "" {
 		_, err := session.Execute("use " + dbname)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return &QlContext{session, dbname, 0}, nil
+	return &TidbContext{session, dbname, 0}, nil
 }
 
-func (qc *QlContext) Status() uint16 {
-	return qc.session.Status()
+func (tc *TidbContext) Status() uint16 {
+	return tc.session.Status()
 }
 
-func (qc *QlContext) LastInsertID() uint64 {
-	return qc.session.LastInsertID()
+func (tc *TidbContext) LastInsertID() uint64 {
+	return tc.session.LastInsertID()
 }
 
-func (qc *QlContext) AffectedRows() uint64 {
-	return qc.session.AffectedRows()
+func (tc *TidbContext) AffectedRows() uint64 {
+	return tc.session.AffectedRows()
 }
 
-func (qc *QlContext) CurrentDB() string {
-	return qc.currentDB
+func (tc *TidbContext) CurrentDB() string {
+	return tc.currentDB
 }
 
-func (qc *QlContext) WarningCount() uint16 {
-	return qc.warningCount
+func (tc *TidbContext) WarningCount() uint16 {
+	return tc.warningCount
 }
 
-func (qc *QlContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
-	qrsList, err := qc.session.Execute(interpolateParams(sql, qc.session.Status()&ServerStatusNoBackslashEscaped > 0, args...))
+func (tc *TidbContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
+	qrsList, err := tc.session.Execute(interpolateParams(sql, tc.session.Status()&ServerStatusNoBackslashEscaped > 0, args...))
 	if err != nil {
 		return
 	}
@@ -73,13 +73,13 @@ func (qc *QlContext) Execute(sql string, args ...interface{}) (rs *ResultSet, er
 	return
 }
 
-func (qc *QlContext) Close() (err error) {
+func (tc *TidbContext) Close() (err error) {
 	//TODO
 	return
 }
 
-func (qc *QlContext) FieldList(table, wildCard string) (colums []*ColumnInfo, err error) {
-	rs, err := qc.Execute("SELECT * FROM " + table + " LIMIT 0")
+func (tc *TidbContext) FieldList(table, wildCard string) (colums []*ColumnInfo, err error) {
+	rs, err := tc.Execute("SELECT * FROM " + table + " LIMIT 0")
 	if err != nil {
 		return
 	}
@@ -87,12 +87,12 @@ func (qc *QlContext) FieldList(table, wildCard string) (colums []*ColumnInfo, er
 	return
 }
 
-func (qc *QlContext) GetStatement(stmtId int) IStatement {
+func (tc *TidbContext) GetStatement(stmtId int) IStatement {
 	//TODO
 	return nil
 }
 
-func (qc *QlContext) Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error) {
+func (tc *TidbContext) Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error) {
 	//TODO
 	return
 }
@@ -110,12 +110,12 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 }
 
 func CreateQlTestDatabase() {
-	qd := &QlDriver{}
-	qc, err := qd.OpenCtx(DefaultCapability, DefaultCollationID, "")
+	td := &TidbDriver{}
+	tc, err := td.OpenCtx(DefaultCapability, DefaultCollationID, "")
 	if err != nil {
 		log.Fatal(err)
 	}
-	qc.Execute("CREATE DATABASE IF NOT EXISTS test")
-	qc.Execute("CREATE DATABASE IF NOT EXISTS gotest")
-	qc.Close()
+	tc.Execute("CREATE DATABASE IF NOT EXISTS test")
+	tc.Execute("CREATE DATABASE IF NOT EXISTS gotest")
+	tc.Close()
 }

@@ -36,7 +36,7 @@ func main() {
 	var driver server.IDriver
 	switch env("MP_DRIVER", "comboql") {
 	case "ql":
-		driver = &server.QlDriver{}
+		driver = &server.TidbDriver{}
 	case "mysql":
 		driver = &server.MysqlDriver{}
 	case "comboql":
