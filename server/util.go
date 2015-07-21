@@ -1,13 +1,11 @@
 package server
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/juju/errors"
@@ -163,72 +161,6 @@ func init() {
 	for i := 0; i < len(tinyIntCache); i++ {
 		tinyIntCache[i] = []byte{byte(i)}
 	}
-}
-
-const timeFormat = "2006-01-02 15:04:05.999999"
-
-func parseTextDateTime(timeStr string, mysqlType uint8, loc *time.Location) (t time.Time, err error) {
-	if len(timeStr) > len(timeFormat) {
-		err = errors.New("illegal argument")
-		return
-	}
-	if mysqlType != TypeTimestamp || loc == nil {
-		loc = time.Local
-	}
-	t, err = time.ParseInLocation(timeFormat[:len(timeStr)], timeStr, loc)
-	return
-}
-
-func dumpTextDateTime(t time.Time, mysqlType uint8, loc *time.Location) []byte {
-	if mysqlType == TypeTimestamp && loc != nil {
-		t = t.In(loc)
-	}
-	if mysqlType == TypeDate {
-		return []byte(t.Format("2006-01-02"))
-	}
-	return []byte(t.Format(timeFormat))
-}
-
-func parseTextTime(timeStr string) (dur time.Duration, err error) {
-	var sign time.Duration = 1
-	if timeStr[0] == '-' {
-		timeStr = timeStr[1:]
-		sign = -1
-	}
-	var hour, minute, second, fraction time.Duration
-	if strings.IndexByte(timeStr, '.') == -1 {
-		_, err = fmt.Sscanf(timeStr, "%d:%d:%d", &hour, &minute, &second)
-	} else {
-		_, err = fmt.Sscanf(timeStr, "%d:%d:%d.%d", &hour, &minute, &second, &fraction)
-	}
-
-	if err != nil {
-		return
-	}
-	dur = hour*time.Hour + minute*time.Minute + second*time.Second + fraction*time.Microsecond
-	dur *= sign
-	return
-}
-
-func dumpTextTime(dur time.Duration) (data []byte) {
-	buf := new(bytes.Buffer)
-	if dur < 0 {
-		buf.WriteByte('-')
-		dur = -dur
-	}
-	hours := dur / time.Hour
-	dur -= hours * time.Hour
-	minutes := dur / time.Minute
-	dur -= minutes * time.Minute
-	seconds := dur / time.Second
-	dur -= seconds * time.Second
-	fraction := dur / time.Microsecond
-	if fraction == 0 {
-		fmt.Fprintf(buf, "%02d:%02d:%02d", hours, minutes, seconds)
-	} else {
-		fmt.Fprintf(buf, "%02d:%02d:%02d.%06d", hours, minutes, seconds, fraction)
-	}
-	return buf.Bytes()
 }
 
 func parseBinaryTime(n int, data []byte) (dur time.Duration, err error) {
@@ -535,8 +467,7 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 			isUnsigned = (col.Flag&UnsignedFlag > 0)
 
 			switch col.Type {
-			case TypeTiny, TypeShort, TypeInt24,
-				TypeLonglong, TypeYear:
+			case TypeTiny, TypeShort, TypeInt24, TypeLonglong:
 				if isUnsigned {
 					values[i], err = strconv.ParseUint(hack.String(v), 10, 64)
 				} else {
@@ -544,10 +475,16 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 				}
 			case TypeFloat, TypeDouble:
 				values[i], err = strconv.ParseFloat(hack.String(v), 64)
-			case TypeTimestamp, TypeDate, TypeNewDate, TypeDatetime:
-				values[i], err = parseTextDateTime(hack.String(v), col.Type, nil)
+			case TypeTimestamp:
+				values[i], err = ParseLocalTimestamp(hack.String(v))
+			case TypeDate, TypeNewDate:
+				values[i], err = ParseDate(hack.String(v))
+			case TypeDatetime:
+				values[i], err = ParseDatetime(hack.String(v))
+			case TypeYear:
+				values[i], err = ParseYear(hack.String(v))
 			case TypeTime:
-				values[i], err = parseTextTime(hack.String(v))
+				values[i], err = ParseTime(hack.String(v))
 			case TypeString, TypeVarString, TypeVarchar:
 				values[i] = hack.String(v)
 			case TypeBlob, TypeLongBlob, TypeMediumBlob, TypeTinyBlob:
@@ -600,9 +537,18 @@ func dumpTextValue(mysqlType uint8, value interface{}) ([]byte, error) {
 	case string:
 		return hack.Slice(v), nil
 	case time.Time:
-		return dumpTextDateTime(v, mysqlType, nil), nil
+		switch mysqlType {
+		case TypeTimestamp:
+			return hack.Slice(FormatTimestampInLocal(v)), nil
+		case TypeDate, TypeNewDate:
+			return hack.Slice(FormatDate(v)), nil
+		case TypeDatetime:
+			return hack.Slice(FormatDatetime(v)), nil
+		default:
+			return nil, fmt.Errorf("invalid mysql type %d", mysqlType)
+		}
 	case time.Duration:
-		return dumpTextTime(v), nil
+		return hack.Slice(FormatTime(v)), nil
 	default:
 		return nil, fmt.Errorf("invalid type %T", value)
 	}
