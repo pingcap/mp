@@ -476,7 +476,7 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 			case TypeFloat, TypeDouble:
 				values[i], err = strconv.ParseFloat(hack.String(v), 64)
 			case TypeTimestamp:
-				values[i], err = ParseLocalTimestamp(hack.String(v))
+				values[i], err = ParseTimestamp(hack.String(v))
 			case TypeDate, TypeNewDate:
 				values[i], err = ParseDate(hack.String(v))
 			case TypeDatetime:
@@ -539,7 +539,7 @@ func dumpTextValue(mysqlType uint8, value interface{}) ([]byte, error) {
 	case time.Time:
 		switch mysqlType {
 		case TypeTimestamp:
-			return hack.Slice(FormatTimestampInLocal(v)), nil
+			return hack.Slice(FormatTimestamp(v)), nil
 		case TypeDate, TypeNewDate:
 			return hack.Slice(FormatDate(v)), nil
 		case TypeDatetime:
