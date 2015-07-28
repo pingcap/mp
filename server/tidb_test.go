@@ -41,6 +41,6 @@ func (ts *TidbTestSuite) TestRegression(c *C) {
 }
 
 func (ts *TidbTestSuite) TestUint64(c *C) {
-	// TODO: passing the test depends on tidb.
-	// runTestPrepareResultFieldType(c)
+	c.Skip("passing the test depends on tidb.")
+	runTestPrepareResultFieldType(c)
 }
