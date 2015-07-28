@@ -3,7 +3,6 @@ package server
 import (
 	"github.com/ngaut/log"
 	"github.com/pingcap/mysqldef"
-	. "github.com/pingcap/mysqldef"
 	"github.com/pingcap/tidb"
 	"github.com/pingcap/tidb/field"
 	"github.com/pingcap/tidb/types"
