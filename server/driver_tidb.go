@@ -2,7 +2,7 @@ package server
 
 import (
 	"github.com/ngaut/log"
-	"github.com/pingcap/mysqldef"
+	. "github.com/pingcap/mysqldef"
 	"github.com/pingcap/tidb"
 	"github.com/pingcap/tidb/field"
 	"github.com/pingcap/tidb/types"
@@ -179,6 +179,9 @@ func (tc *TidbContext) GetStatement(stmtId int) IStatement {
 
 func (tc *TidbContext) Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error) {
 	stmtId, paramCount, fields, err := tc.session.PrepareStmt(sql)
+	if err != nil {
+		return
+	}
 	stmt := &TidbStatement{
 		id:          stmtId,
 		numParams:   paramCount,
@@ -193,7 +196,7 @@ func (tc *TidbContext) Prepare(sql string) (statement IStatement, columns, param
 	params = make([]*ColumnInfo, paramCount)
 	for i := range params {
 		params[i] = &ColumnInfo{
-			Type: mysqldef.TypeBlob,
+			Type: TypeBlob,
 		}
 	}
 	tc.stmts[int(stmtId)] = stmt
