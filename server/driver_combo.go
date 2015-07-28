@@ -165,9 +165,9 @@ func (cc *ComboContext) Close() error {
 	return nil
 }
 
-func (cc *ComboContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
-	mrs, merr := cc.mc.Execute(sql, args...)
-	trs, terr := cc.tc.Execute(sql, args...)
+func (cc *ComboContext) Execute(sql string) (rs *ResultSet, err error) {
+	mrs, merr := cc.mc.Execute(sql)
+	trs, terr := cc.tc.Execute(sql)
 	comp := new(Compare)
 	comp.sql = sql
 	comp.rset[0] = mrs

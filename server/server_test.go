@@ -122,17 +122,15 @@ func runTestRegression(c *C) {
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
 		dbt.Check(count, Equals, int64(0))
-	})
-}
 
-func runTestIssue1(c *C) {
-	runTests(c, dsn, func(dbt *DBTest) {
 		dbt.mustQueryRows("SELECT 1")
-	})
-}
 
-func runTestIssue2(c *C) {
-	runTests(c, dsn, func(dbt *DBTest) {
-		dbt.mustExec("CREATE TABLE textable (id int, name text)")
+		b := []byte("")
+		if err := dbt.db.QueryRow("SELECT ?", b).Scan(&b); err != nil {
+			dbt.Fatal(err)
+		}
+		if b == nil {
+			dbt.Error("nil echo from non-nil input")
+		}
 	})
 }

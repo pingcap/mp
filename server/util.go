@@ -10,7 +10,6 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
-	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mysqldef"
 )
@@ -164,6 +163,9 @@ func init() {
 }
 
 func parseBinaryTime(n int, data []byte) (dur time.Duration, err error) {
+	if n == 0 {
+		return
+	}
 	var sign time.Duration = 1
 	if data[0] == 1 {
 		sign = -1
@@ -363,7 +365,7 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 			if err != nil {
 				return nil, err
 			}
-
+			continue
 		case TypeTime:
 			var num uint64
 			num, isNull, n = parseLengthEncodedInt(rowData[pos:])
@@ -475,16 +477,10 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 				}
 			case TypeFloat, TypeDouble:
 				values[i], err = strconv.ParseFloat(hack.String(v), 64)
-			case TypeTimestamp:
-				values[i], err = ParseTimestamp(hack.String(v))
-			case TypeDate, TypeNewDate:
-				values[i], err = ParseDate(hack.String(v))
-			case TypeDatetime:
-				values[i], err = ParseDatetime(hack.String(v))
+			case TypeDate, TypeNewDate, TypeDatetime, TypeTimestamp, TypeTime:
+				values[i] = hack.String(v)
 			case TypeYear:
 				values[i], err = ParseYear(hack.String(v))
-			case TypeTime:
-				values[i], err = ParseTime(hack.String(v))
 			case TypeString, TypeVarString, TypeVarchar:
 				values[i] = hack.String(v)
 			case TypeBlob, TypeLongBlob, TypeMediumBlob, TypeTinyBlob:
@@ -498,7 +494,6 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 			}
 
 			if err != nil {
-				log.Debug(col.Type, hack.String(v))
 				return nil, errors.Trace(err)
 			}
 		}

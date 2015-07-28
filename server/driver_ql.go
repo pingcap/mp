@@ -131,8 +131,8 @@ func (tc *TidbContext) WarningCount() uint16 {
 	return tc.warningCount
 }
 
-func (tc *TidbContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
-	qrsList, err := tc.session.Execute(interpolateParams(sql, tc.session.Status()&ServerStatusNoBackslashEscaped > 0, args...))
+func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
+	qrsList, err := tc.session.Execute(sql)
 	if err != nil {
 		return
 	}

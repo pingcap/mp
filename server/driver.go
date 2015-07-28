@@ -14,7 +14,7 @@ type IContext interface {
 	AffectedRows() uint64
 	WarningCount() uint16
 	CurrentDB() string
-	Execute(sql string, args ...interface{}) (*ResultSet, error)
+	Execute(sql string) (*ResultSet, error)
 	Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error)
 	GetStatement(stmtId int) IStatement
 	FieldList(tableName, wildCard string) (columns []*ColumnInfo, err error)

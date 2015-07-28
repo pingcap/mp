@@ -39,11 +39,3 @@ func (ts *TidbTestSuite) TestRegression(c *C) {
 		runTestRegression(c)
 	}
 }
-
-func (ts *TidbTestSuite) TestIssue1(c *C) {
-	runTestIssue1(c)
-}
-
-func (ts *TidbTestSuite) TestIssue2(c *C) {
-	runTestIssue2(c)
-}
