@@ -67,7 +67,7 @@ func (ms *MysqlStatement) sendExecuteCommand(args ...interface{}) error {
 	const minPktLen = 4 + 1 + 4 + 1 + 4
 	mc := ms.mConn
 
-	var data = make([]byte, minPktLen)
+	data := make([]byte, minPktLen)
 	if data == nil {
 		// can not take the buffer. Something must be wrong with the connection
 		return ErrBadConn
@@ -121,9 +121,7 @@ func (ms *MysqlStatement) sendExecuteCommand(args ...interface{}) error {
 		paramTypes := data[pos:]
 		pos += len(args) * 2
 
-		// value of each parameter [n bytes]
-		paramValues := data[pos:pos]
-		valuesCap := cap(paramValues)
+		var paramValues []byte
 
 		for i, arg := range args {
 			// build NULL-bitmap
@@ -139,39 +137,14 @@ func (ms *MysqlStatement) sendExecuteCommand(args ...interface{}) error {
 			case int64:
 				paramTypes[i+i] = TypeLonglong
 				paramTypes[i+i+1] = 0x00
-
-				if cap(paramValues)-len(paramValues)-8 >= 0 {
-					paramValues = paramValues[:len(paramValues)+8]
-					binary.LittleEndian.PutUint64(
-						paramValues[len(paramValues)-8:],
-						uint64(v),
-					)
-				} else {
-					paramValues = append(paramValues,
-						dumpUint64(uint64(v))...,
-					)
-				}
-
+				paramValues = append(paramValues, dumpUint64(uint64(v))...)
 			case float64:
 				paramTypes[i+i] = TypeDouble
 				paramTypes[i+i+1] = 0x00
-
-				if cap(paramValues)-len(paramValues)-8 >= 0 {
-					paramValues = paramValues[:len(paramValues)+8]
-					binary.LittleEndian.PutUint64(
-						paramValues[len(paramValues)-8:],
-						math.Float64bits(v),
-					)
-				} else {
-					paramValues = append(paramValues,
-						dumpUint64(math.Float64bits(v))...,
-					)
-				}
-
+				paramValues = append(paramValues, dumpUint64(math.Float64bits(v))...)
 			case bool:
 				paramTypes[i+i] = TypeTiny
 				paramTypes[i+i+1] = 0x00
-
 				if v {
 					paramValues = append(paramValues, 0x01)
 				} else {
@@ -208,11 +181,7 @@ func (ms *MysqlStatement) sendExecuteCommand(args ...interface{}) error {
 				return fmt.Errorf("Can't convert type: %T", arg)
 			}
 		}
-		// Check if param values exceeded the available buffer
-		// In that case we must build the data packet with the new values buffer
-		if valuesCap != cap(paramValues) {
-			data = append(data[:pos], paramValues...)
-		}
+		data = append(data[:pos], paramValues...)
 
 		pos += len(paramValues)
 		data = data[:pos]
