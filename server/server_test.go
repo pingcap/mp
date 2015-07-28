@@ -93,8 +93,7 @@ func runTestRegression(c *C) {
 		rows.Close()
 
 		// Update
-		res = dbt.mustExec(interpolateParams("UPDATE test SET val = 0 WHERE val = ?", false, 1))
-		//		res = dbt.mustExec("UPDATE test SET val = 0 WHERE val = ?", 1)
+		res = dbt.mustExec("UPDATE test SET val = 0 WHERE val = ?", 1)
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
 		dbt.Check(count, Equals, int64(1))
