@@ -41,33 +41,33 @@ func (ts *TidbStatement) Execute(args ...interface{}) (rs *ResultSet, err error)
 			args[i] = types.IdealFloat(v)
 		}
 	}
-	tirs, err := ts.ctx.session.ExecutePreparedStmt(ts.id, args...)
+	tidbRecordset, err := ts.ctx.session.ExecutePreparedStmt(ts.id, args...)
 	if err != nil {
 		return nil, err
 	}
-	if tirs == nil {
+	if tidbRecordset == nil {
 		return
 	}
 	rs = new(ResultSet)
-	fields, err := tirs.Fields()
+	fields, err := tidbRecordset.Fields()
 	if err != nil {
 		return
 	}
 	for _, v := range fields {
 		rs.Columns = append(rs.Columns, convertColumnInfo(v))
 	}
-	rs.Rows, err = tirs.Rows(-1, 0)
+	rs.Rows, err = tidbRecordset.Rows(-1, 0)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func (ts *TidbStatement) AppendParam(paramId int, data []byte) error {
-	if paramId >= len(ts.boundParams) {
+func (ts *TidbStatement) AppendParam(paramID int, data []byte) error {
+	if paramID >= len(ts.boundParams) {
 		return NewDefaultError(ER_WRONG_ARGUMENTS, "stmt_send_longdata")
 	}
-	ts.boundParams[paramId] = append(ts.boundParams[paramId], data...)
+	ts.boundParams[paramID] = append(ts.boundParams[paramID], data...)
 	return nil
 }
 

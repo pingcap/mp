@@ -39,3 +39,8 @@ func (ts *TidbTestSuite) TestRegression(c *C) {
 		runTestRegression(c)
 	}
 }
+
+func (ts *TidbTestSuite) TestUint64(c *C) {
+	// TODO: passing the test depends on tidb.
+	// runTestPrepareResultFieldType(c)
+}

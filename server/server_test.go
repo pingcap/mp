@@ -133,3 +133,24 @@ func runTestRegression(c *C) {
 		}
 	})
 }
+
+func runTestPrepareResultFieldType(t *C) {
+	var param int64 = 83
+	runTests(t, dsn, func(dbt *DBTest) {
+		stmt, err := dbt.db.Prepare(`SELECT ?`)
+		if err != nil {
+			dbt.Fatal(err)
+		}
+		defer stmt.Close()
+		row := stmt.QueryRow(param)
+		var result int64
+		err = row.Scan(&result)
+		if err != nil {
+			dbt.Fatal(err)
+		}
+		switch {
+		case result != param:
+			dbt.Fatal("Unexpected result value")
+		}
+	})
+}

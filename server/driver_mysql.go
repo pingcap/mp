@@ -62,23 +62,15 @@ func (md *MysqlDriver) OpenCtx(capability uint32, collation uint8, dbname string
 	return
 }
 
-func (ms *MysqlStatement) Execute(args ...interface{}) (rs *ResultSet, err error) {
-	ms.Reset()
-	if len(args) != ms.NumParams() {
-		return nil, fmt.Errorf(
-			"Arguments count mismatch (Got: %d Has: %d)",
-			len(args),
-			ms.NumParams(),
-		)
-	}
-
+// Reference: https://dev.mysql.com/doc/internals/en/com-stmt-execute.html
+func (ms *MysqlStatement) sendExecuteCommand(args ...interface{}) error {
 	const minPktLen = 4 + 1 + 4 + 1 + 4
 	mc := ms.mConn
 
 	var data = make([]byte, minPktLen)
 	if data == nil {
 		// can not take the buffer. Something must be wrong with the connection
-		return nil, ErrBadConn
+		return ErrBadConn
 	}
 
 	// command [1 byte]
@@ -213,7 +205,7 @@ func (ms *MysqlStatement) Execute(args ...interface{}) (rs *ResultSet, err error
 				paramValues = append(paramValues, val...)
 
 			default:
-				return nil, fmt.Errorf("Can't convert type: %T", arg)
+				return fmt.Errorf("Can't convert type: %T", arg)
 			}
 		}
 		// Check if param values exceeded the available buffer
@@ -227,14 +219,27 @@ func (ms *MysqlStatement) Execute(args ...interface{}) (rs *ResultSet, err error
 	}
 	mc.pkg.Sequence = 0
 	mc.warningCount = 0
-	err = mc.writePacket(data)
-	if err != nil {
-		return nil, err
+	return mc.writePacket(data)
+}
+
+func (ms *MysqlStatement) Execute(args ...interface{}) (rs *ResultSet, err error) {
+	ms.Reset()
+	if len(args) != ms.NumParams() {
+		return nil, fmt.Errorf(
+			"Arguments count mismatch (Got: %d Has: %d)",
+			len(args),
+			ms.NumParams(),
+		)
 	}
+	err = ms.sendExecuteCommand(args...)
+	if err != nil {
+		return
+	}
+
 	if ms.numColumns > 0 {
-		rs, err = mc.readResult(true)
+		rs, err = ms.mConn.readResult(true)
 	} else {
-		err = mc.readOK()
+		err = ms.mConn.readOK()
 	}
 	return
 }
