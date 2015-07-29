@@ -99,9 +99,9 @@ type ComboContext struct {
 	tc            IContext
 }
 
-func NewComboDriver(useQlResult bool) *ComboDriver {
+func NewComboDriver(useTidbResult bool) *ComboDriver {
 	return &ComboDriver{
-		UseTidbResult: useQlResult,
+		UseTidbResult: useTidbResult,
 	}
 }
 
@@ -165,9 +165,9 @@ func (cc *ComboContext) Close() error {
 	return nil
 }
 
-func (cc *ComboContext) Execute(sql string, args ...interface{}) (rs *ResultSet, err error) {
-	mrs, merr := cc.mc.Execute(sql, args...)
-	trs, terr := cc.tc.Execute(sql, args...)
+func (cc *ComboContext) Execute(sql string) (rs *ResultSet, err error) {
+	mrs, merr := cc.mc.Execute(sql)
+	trs, terr := cc.tc.Execute(sql)
 	comp := new(Compare)
 	comp.sql = sql
 	comp.rset[0] = mrs
@@ -193,11 +193,20 @@ func (cc *ComboContext) Execute(sql string, args ...interface{}) (rs *ResultSet,
 }
 
 func (cc *ComboContext) Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error) {
-	return cc.mc.Prepare(sql)
+	if cc.useTidbResult {
+		statement, columns, params, err = cc.tc.Prepare(sql)
+	} else {
+		statement, columns, params, err = cc.mc.Prepare(sql)
+	}
+	return
 }
 
 func (cc *ComboContext) GetStatement(stmtId int) IStatement {
-	return cc.mc.GetStatement(stmtId)
+	if cc.useTidbResult {
+		return cc.tc.GetStatement(stmtId)
+	} else {
+		return cc.mc.GetStatement(stmtId)
+	}
 }
 
 func (cc *ComboContext) FieldList(tableName, wildCard string) (columns []*ColumnInfo, err error) {

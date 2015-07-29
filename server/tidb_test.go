@@ -40,10 +40,7 @@ func (ts *TidbTestSuite) TestRegression(c *C) {
 	}
 }
 
-func (ts *TidbTestSuite) TestIssue1(c *C) {
-	runTestIssue1(c)
-}
-
-func (ts *TidbTestSuite) TestIssue2(c *C) {
-	runTestIssue2(c)
+func (ts *TidbTestSuite) TestUint64(c *C) {
+	c.Skip("passing the test depends on tidb.")
+	runTestPrepareResultFieldType(c)
 }

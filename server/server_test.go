@@ -93,8 +93,7 @@ func runTestRegression(c *C) {
 		rows.Close()
 
 		// Update
-		res = dbt.mustExec(interpolateParams("UPDATE test SET val = 0 WHERE val = ?", false, 1))
-		//		res = dbt.mustExec("UPDATE test SET val = 0 WHERE val = ?", 1)
+		res = dbt.mustExec("UPDATE test SET val = 0 WHERE val = ?", 1)
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
 		dbt.Check(count, Equals, int64(1))
@@ -122,17 +121,36 @@ func runTestRegression(c *C) {
 		count, err = res.RowsAffected()
 		dbt.Assert(err, IsNil)
 		dbt.Check(count, Equals, int64(0))
-	})
-}
 
-func runTestIssue1(c *C) {
-	runTests(c, dsn, func(dbt *DBTest) {
 		dbt.mustQueryRows("SELECT 1")
+
+		b := []byte("")
+		if err := dbt.db.QueryRow("SELECT ?", b).Scan(&b); err != nil {
+			dbt.Fatal(err)
+		}
+		if b == nil {
+			dbt.Error("nil echo from non-nil input")
+		}
 	})
 }
 
-func runTestIssue2(c *C) {
-	runTests(c, dsn, func(dbt *DBTest) {
-		dbt.mustExec("CREATE TABLE textable (id int, name text)")
+func runTestPrepareResultFieldType(t *C) {
+	var param int64 = 83
+	runTests(t, dsn, func(dbt *DBTest) {
+		stmt, err := dbt.db.Prepare(`SELECT ?`)
+		if err != nil {
+			dbt.Fatal(err)
+		}
+		defer stmt.Close()
+		row := stmt.QueryRow(param)
+		var result int64
+		err = row.Scan(&result)
+		if err != nil {
+			dbt.Fatal(err)
+		}
+		switch {
+		case result != param:
+			dbt.Fatal("Unexpected result value")
+		}
 	})
 }

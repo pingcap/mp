@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"net"
+	"time"
 
 	"github.com/juju/errors"
 	"github.com/pingcap/mp/hack"
@@ -18,6 +20,7 @@ type MysqlStatement struct {
 	id          int
 	sql         string
 	boundParams [][]byte
+	numColumns  int
 }
 
 type MysqlConn struct {
@@ -59,9 +62,155 @@ func (md *MysqlDriver) OpenCtx(capability uint32, collation uint8, dbname string
 	return
 }
 
+// Reference: https://dev.mysql.com/doc/internals/en/com-stmt-execute.html
+func (ms *MysqlStatement) sendExecuteCommand(args ...interface{}) error {
+	const minPktLen = 4 + 1 + 4 + 1 + 4
+	mc := ms.mConn
+
+	data := make([]byte, minPktLen)
+	if data == nil {
+		// can not take the buffer. Something must be wrong with the connection
+		return ErrBadConn
+	}
+
+	// command [1 byte]
+	data[4] = ComStmtExecute
+
+	// statement_id [4 bytes]
+	data[5] = byte(ms.id)
+	data[6] = byte(ms.id >> 8)
+	data[7] = byte(ms.id >> 16)
+	data[8] = byte(ms.id >> 24)
+
+	// flags (0: CURSOR_TYPE_NO_CURSOR) [1 byte]
+	data[9] = 0x00
+
+	// iteration_count (uint32(1)) [4 bytes]
+	data[10] = 0x01
+	data[11] = 0x00
+	data[12] = 0x00
+	data[13] = 0x00
+
+	if len(args) > 0 {
+		pos := minPktLen
+
+		var nullMask []byte
+		if maskLen, typesLen := (len(args)+7)/8, 1+2*len(args); pos+maskLen+typesLen >= len(data) {
+			// buffer has to be extended but we don't know by how much so
+			// we depend on append after all data with known sizes fit.
+			// We stop at that because we deal with a lot of columns here
+			// which makes the required allocation size hard to guess.
+			tmp := make([]byte, pos+maskLen+typesLen)
+			copy(tmp[:pos], data[:pos])
+			data = tmp
+			nullMask = data[pos : pos+maskLen]
+			pos += maskLen
+		} else {
+			nullMask = data[pos : pos+maskLen]
+			for i := 0; i < maskLen; i++ {
+				nullMask[i] = 0
+			}
+			pos += maskLen
+		}
+
+		// newParameterBoundFlag 1 [1 byte]
+		data[pos] = 0x01
+		pos++
+
+		// type of each parameter [len(args)*2 bytes]
+		paramTypes := data[pos:]
+		pos += len(args) * 2
+
+		var paramValues []byte
+
+		for i, arg := range args {
+			// build NULL-bitmap
+			if arg == nil {
+				nullMask[i/8] |= 1 << (uint(i) & 7)
+				paramTypes[i+i] = TypeNull
+				paramTypes[i+i+1] = 0x00
+				continue
+			}
+
+			// cache types and values
+			switch v := arg.(type) {
+			case int64:
+				paramTypes[i+i] = TypeLonglong
+				paramTypes[i+i+1] = 0x00
+				paramValues = append(paramValues, dumpUint64(uint64(v))...)
+			case float64:
+				paramTypes[i+i] = TypeDouble
+				paramTypes[i+i+1] = 0x00
+				paramValues = append(paramValues, dumpUint64(math.Float64bits(v))...)
+			case bool:
+				paramTypes[i+i] = TypeTiny
+				paramTypes[i+i+1] = 0x00
+				if v {
+					paramValues = append(paramValues, 0x01)
+				} else {
+					paramValues = append(paramValues, 0x00)
+				}
+
+			case []byte:
+				paramTypes[i+i] = TypeString
+				paramTypes[i+i+1] = 0x00
+				paramValues = append(paramValues, dumpLengthEncodedInt(uint64(len(v)))...)
+				paramValues = append(paramValues, v...)
+
+			case string:
+				paramTypes[i+i] = TypeString
+				paramTypes[i+i+1] = 0x00
+				paramValues = append(paramValues, dumpLengthEncodedInt(uint64(len(v)))...)
+				paramValues = append(paramValues, v...)
+
+			case time.Time:
+				paramTypes[i+i] = TypeString
+				paramTypes[i+i+1] = 0x00
+
+				var val []byte
+				if v.IsZero() {
+					val = []byte("0000-00-00")
+				} else {
+					val = []byte(FormatDatetime(v))
+				}
+
+				paramValues = append(paramValues, dumpLengthEncodedInt(uint64(len(val)))...)
+				paramValues = append(paramValues, val...)
+
+			default:
+				return fmt.Errorf("Can't convert type: %T", arg)
+			}
+		}
+		data = append(data[:pos], paramValues...)
+
+		pos += len(paramValues)
+		data = data[:pos]
+	}
+	mc.pkg.Sequence = 0
+	mc.warningCount = 0
+	return mc.writePacket(data)
+}
+
 func (ms *MysqlStatement) Execute(args ...interface{}) (rs *ResultSet, err error) {
 	ms.Reset()
-	return ms.mConn.Execute(ms.sql, args...)
+	if len(args) != ms.NumParams() {
+		return nil, fmt.Errorf(
+			"Arguments count mismatch (Got: %d Has: %d)",
+			len(args),
+			ms.NumParams(),
+		)
+	}
+	err = ms.sendExecuteCommand(args...)
+	if err != nil {
+		return
+	}
+
+	if ms.numColumns > 0 {
+		rs, err = ms.mConn.readResult(true)
+	} else {
+		err = ms.mConn.readOK()
+	}
+	return
 }
 
 func (ms *MysqlStatement) AppendParam(paramId int, data []byte) (err error) {
@@ -342,10 +491,7 @@ func (mc *MysqlConn) GetDB() string {
 	return mc.db
 }
 
-func (mc *MysqlConn) Execute(command string, args ...interface{}) (*ResultSet, error) {
-	if len(args) != 0 {
-		command = interpolateParams(command, mc.status&ServerStatusNoBackslashEscaped > 0, args...)
-	}
+func (mc *MysqlConn) Execute(command string) (*ResultSet, error) {
 	return mc.exec(command)
 }
 
@@ -384,6 +530,7 @@ func (mc *MysqlConn) FieldList(table string, wildcard string) ([]*ColumnInfo, er
 }
 
 func (mc *MysqlConn) exec(query string) (*ResultSet, error) {
+	mc.warningCount = 0
 	if err := mc.writeCommandBuf(byte(ComQuery), hack.Slice(query)); err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -622,6 +769,7 @@ func (mc *MysqlConn) Prepare(query string) (stmt IStatement, columns, params []*
 	//number columns
 	numColumns := int(binary.LittleEndian.Uint16(data[pos:]))
 	pos += 2
+	mStmt.numColumns = numColumns
 
 	//number params
 	numParams := int(binary.LittleEndian.Uint16(data[pos:]))

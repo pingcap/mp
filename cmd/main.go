@@ -34,12 +34,12 @@ func main() {
 	server.CreateQlTestDatabase()
 	var svr *server.Server
 	var driver server.IDriver
-	switch env("MP_DRIVER", "comboql") {
-	case "ql":
+	switch env("MP_DRIVER", "tidb") {
+	case "tidb":
 		driver = &server.TidbDriver{}
 	case "mysql":
 		driver = &server.MysqlDriver{}
-	case "comboql":
+	case "combotidb":
 		driver = server.NewComboDriver(true)
 	case "combo":
 		driver = server.NewComboDriver(false)
