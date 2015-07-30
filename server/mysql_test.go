@@ -37,4 +37,5 @@ func (ts *MysqlTestSuite) TestT(c *C) {
 	if regression {
 		runTestRegression(c)
 	}
+	runTestSpecialType(c)
 }
