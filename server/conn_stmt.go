@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mysqldef"
 )
 
@@ -253,7 +254,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			}
 
 			if !isNull {
-				args[i] = v
+				args[i] = hack.String(v)
 				continue
 			} else {
 				args[i] = nil
