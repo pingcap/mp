@@ -170,3 +170,16 @@ func runTestSpecialType(t *C) {
 		t.Assert(outC, Equals, "04:23:34")
 	})
 }
+
+func runTestPreparedString(t *C) {
+	runTests(t, dsn, func(dbt *DBTest) {
+		dbt.mustExec("create table test (a text)")
+		dbt.mustExec("insert test values (?)", "abc")
+		rows := dbt.mustQuery("select * from test")
+		t.Assert(rows.Next(), Equals, true)
+		var out string
+		err := rows.Scan(&out)
+		t.Assert(err, IsNil)
+		t.Assert(out, Equals, "abc")
+	})
+}

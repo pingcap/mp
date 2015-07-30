@@ -48,3 +48,7 @@ func (ts *TidbTestSuite) TestUint64(c *C) {
 func (ts *TidbTestSuite) TestSpecialType(c *C) {
 	runTestSpecialType(c)
 }
+
+func (ts *TidbTestSuite) TestPreparedString(c *C) {
+	runTestPreparedString(c)
+}
