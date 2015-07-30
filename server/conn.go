@@ -213,7 +213,6 @@ func (cc *ClientConn) Run() {
 			}
 			return
 		}
-		log.Debug("packet length", len(data))
 
 		if err := cc.dispatch(data); err != nil {
 			log.Errorf("dispatch error %s, %s", errors.ErrorStack(err), cc)
