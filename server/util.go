@@ -531,19 +531,12 @@ func dumpTextValue(mysqlType uint8, value interface{}) ([]byte, error) {
 		return v, nil
 	case string:
 		return hack.Slice(v), nil
-	case time.Time:
-		switch mysqlType {
-		case TypeTimestamp:
-			return hack.Slice(FormatTimestamp(v)), nil
-		case TypeDate, TypeNewDate:
-			return hack.Slice(FormatDate(v)), nil
-		case TypeDatetime:
-			return hack.Slice(FormatDatetime(v)), nil
-		default:
-			return nil, fmt.Errorf("invalid mysql type %d", mysqlType)
-		}
-	case time.Duration:
-		return hack.Slice(FormatTime(v)), nil
+	case Time:
+		return hack.Slice(v.String()), nil
+	case Duration:
+		return hack.Slice(v.String()), nil
+	case Decimal:
+		return hack.Slice(v.String()), nil
 	default:
 		return nil, fmt.Errorf("invalid type %T", value)
 	}
