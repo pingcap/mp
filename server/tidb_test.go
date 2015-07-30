@@ -44,3 +44,7 @@ func (ts *TidbTestSuite) TestUint64(c *C) {
 	c.Skip("passing the test depends on tidb.")
 	runTestPrepareResultFieldType(c)
 }
+
+func (ts *TidbTestSuite) TestSpecialType(c *C) {
+	runTestSpecialType(c)
+}

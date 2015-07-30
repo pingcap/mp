@@ -157,17 +157,16 @@ func runTestPrepareResultFieldType(t *C) {
 
 func runTestSpecialType(t *C) {
 	runTests(t, dsn, func(dbt *DBTest) {
-		dbt.mustExec("create table test (a decimal, b datetime, c time)")
-		dbt.mustExec("insert test values (1, '2012-12-21 12:12:12', '-100:23:34')")
+		dbt.mustExec("create table test (a decimal(10, 5), b datetime, c time)")
+		dbt.mustExec("insert test values (1.4, '2012-12-21 12:12:12', '4:23:34')")
 		rows := dbt.mustQuery("select * from test")
 		t.Assert(rows.Next(), Equals, true)
-		var outA int
-		var outB string
-		var outC string
+		var outA float64
+		var outB, outC string
 		err := rows.Scan(&outA, &outB, &outC)
 		t.Assert(err, IsNil)
-		t.Assert(outA, Equals, 1)
+		t.Assert(outA, Equals, 1.4)
 		t.Assert(outB, Equals, "2012-12-21 12:12:12")
-		t.Assert(outC, Equals, "-100:23:34")
+		t.Assert(outC, Equals, "04:23:34")
 	})
 }
