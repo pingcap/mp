@@ -261,11 +261,11 @@ func parseBinaryDateTime(num int, data []byte, mysqlType uint8, loc *time.Locati
 	return
 }
 
-func dumpBinaryDateTime(t time.Time, mysqlType uint8, loc *time.Location) (data []byte) {
-	if mysqlType == TypeTimestamp && loc != nil {
-		t = t.In(loc)
+func dumpBinaryDateTime(t Time, loc *time.Location) (data []byte) {
+	if t.Type == TypeTimestamp && loc != nil {
+		t.Time = t.In(loc)
 	}
-	switch mysqlType {
+	switch t.Type {
 	case TypeTimestamp, TypeDatetime:
 		data = append(data, 11)
 		data = append(data, dumpUint16(uint16(t.Year()))...) //year
@@ -440,10 +440,12 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 			data = append(data, dumpLengthEncodedString(hack.Slice(v), alloc)...)
 		case []byte:
 			data = append(data, dumpLengthEncodedString(v, alloc)...)
-		case time.Time:
-			data = append(data, dumpBinaryDateTime(v, columns[i].Type, nil)...)
-		case time.Duration:
-			data = append(data, dumpBinaryTime(v)...)
+		case Time:
+			data = append(data, dumpBinaryDateTime(v, nil)...)
+		case Duration:
+			data = append(data, dumpBinaryTime(time.Duration(v))...)
+		case Decimal:
+			data = append(data, dumpLengthEncodedString(hack.Slice(v.String()), alloc)...)
 		}
 	}
 	return

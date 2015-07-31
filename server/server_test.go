@@ -159,7 +159,7 @@ func runTestSpecialType(t *C) {
 	runTests(t, dsn, func(dbt *DBTest) {
 		dbt.mustExec("create table test (a decimal(10, 5), b datetime, c time)")
 		dbt.mustExec("insert test values (1.4, '2012-12-21 12:12:12', '4:23:34')")
-		rows := dbt.mustQuery("select * from test")
+		rows := dbt.mustQuery("select * from test where a > ?", 0)
 		t.Assert(rows.Next(), Equals, true)
 		var outA float64
 		var outB, outC string
