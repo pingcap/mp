@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/pingcap/mp/etc"
+	"github.com/pingcap/tidb"
 	. "gopkg.in/check.v1"
 )
 
@@ -15,6 +16,8 @@ type TidbTestSuite struct {
 var _ = Suite(new(TidbTestSuite))
 
 func (ts *TidbTestSuite) SetUpSuite(c *C) {
+	tidb.RemoveDatabase()
+	tidb.NewDatabase()
 	CreateQlTestDatabase()
 	ts.tidbdrv = &TidbDriver{}
 	cfg := &etc.Config{

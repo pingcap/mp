@@ -11,6 +11,7 @@ import (
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/etc"
 	"github.com/pingcap/mp/server"
+	"github.com/pingcap/tidb"
 )
 
 func env(key, defaultValue string) string {
@@ -31,6 +32,7 @@ func main() {
 	}
 
 	log.SetLevelByString(cfg.LogLevel)
+	tidb.NewDatabase()
 	server.CreateQlTestDatabase()
 	var svr *server.Server
 	var driver server.IDriver

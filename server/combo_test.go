@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/pingcap/mp/etc"
+	"github.com/pingcap/tidb"
 	. "gopkg.in/check.v1"
 )
 
@@ -15,6 +16,8 @@ type ComboTestSuite struct {
 var _ = Suite(&ComboTestSuite{})
 
 func (ts *ComboTestSuite) SetUpSuite(c *C) {
+	tidb.RemoveDatabase()
+	tidb.NewDatabase()
 	ts.driver = NewComboDriver(false)
 	cfg := &etc.Config{
 		Addr:     ":4000",
