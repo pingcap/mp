@@ -1,8 +1,6 @@
 package main
 
 import (
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
@@ -66,9 +64,5 @@ func main() {
 		os.Exit(0)
 	}()
 
-	go svr.Run()
-
-	//todo: using configuration
-	log.Warning("started")
-	http.ListenAndServe(":8888", nil)
+	log.Error(svr.Run())
 }
