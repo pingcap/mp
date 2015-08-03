@@ -38,3 +38,11 @@ func (ts *MysqlTestSuite) TestT(c *C) {
 		runTestRegression(c)
 	}
 }
+
+func (ts *MysqlTestSuite) TestPreparedString(c *C) {
+	runTestPreparedString(c)
+}
+
+func (ts *MysqlTestSuite) TestSpecialType(c *C) {
+	runTestSpecialType(c)
+}

@@ -442,8 +442,13 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 			data = append(data, dumpLengthEncodedString(v, alloc)...)
 		case Time:
 			data = append(data, dumpBinaryDateTime(v, nil)...)
+		case time.Time:
+			myTime := Time{v, columns[i].Type}
+			data = append(data, dumpBinaryDateTime(myTime, nil)...)
 		case Duration:
 			data = append(data, dumpBinaryTime(time.Duration(v))...)
+		case time.Duration:
+			data = append(data, dumpBinaryTime(v)...)
 		case Decimal:
 			data = append(data, dumpLengthEncodedString(hack.Slice(v.String()), alloc)...)
 		}
