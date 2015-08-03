@@ -41,11 +41,26 @@ func (d *Compare) String() string {
 			return s
 		}
 
-		for i, v := range mysqlRset.Columns {
-			mtype := mysqlRset.Columns[i].Type
-			qType := tidbRset.Columns[i].Type
-			if mtype != qType {
-				s += fmt.Sprintf("expect column %s type %d, got %d\n", v.Name, mtype, qType)
+		for i, mCol := range mysqlRset.Columns {
+			tCol := tidbRset.Columns[i]
+			if mCol.Type != tCol.Type {
+				s += fmt.Sprintf("expect column %s type %d, got %d\n", mCol.Name, mCol.Type, tCol.Type)
+				return s
+			}
+			if mCol.ColumnLength != tCol.ColumnLength {
+				s += fmt.Sprintf("expect column %s length %d, got %d\n", mCol.Name, mCol.ColumnLength, tCol.ColumnLength)
+				return s
+			}
+			if mCol.Flag != tCol.Flag {
+				s += fmt.Sprintf("expect column %s flag %d, got %d\n", mCol.Name, mCol.Flag, tCol.Flag)
+				return s
+			}
+			if mCol.Charset != tCol.Charset {
+				s += fmt.Sprintf("expect column %s charset %d, got %d\n", mCol.Name, mCol.Charset, tCol.Charset)
+				return s
+			}
+			if mCol.Decimal != tCol.Decimal {
+				s += fmt.Sprintf("expect column %s charset %d, got %d\n", mCol.Name, mCol.Decimal, tCol.Decimal)
 				return s
 			}
 			//TODO compare more column info
@@ -97,6 +112,85 @@ type ComboContext struct {
 	useTidbResult bool
 	mc            IContext
 	tc            IContext
+	stmts         map[int]IStatement
+}
+
+type ComboStatement struct {
+	cc  *ComboContext
+	sql string
+	ms  IStatement
+	ts  IStatement
+}
+
+func (cs *ComboStatement) ID() int {
+	if cs.cc.useTidbResult {
+		return cs.ts.ID()
+	} else {
+		return cs.ms.ID()
+	}
+}
+
+func (cs *ComboStatement) Execute(args ...interface{}) (*ResultSet, error) {
+	mrs, merr := cs.ms.Execute(args...)
+	trs, terr := cs.ts.Execute(args...)
+	comp := new(Compare)
+	comp.sql = cs.sql
+	comp.rset[0] = mrs
+	comp.rset[1] = trs
+	comp.affectedRows[0] = cs.cc.mc.AffectedRows()
+	comp.affectedRows[1] = cs.cc.tc.AffectedRows()
+	comp.lastInsertID[0] = cs.cc.mc.LastInsertID()
+	comp.lastInsertID[1] = cs.cc.tc.LastInsertID()
+	comp.status[0] = cs.cc.mc.Status()
+	comp.status[1] = cs.cc.tc.Status()
+	comp.warningCount[0] = cs.cc.mc.WarningCount()
+	comp.warningCount[1] = cs.cc.tc.WarningCount()
+	comp.err[0] = merr
+	comp.err[1] = terr
+	compStr := comp.String()
+	if compStr != "" {
+		log.Warning(compStr)
+	}
+	if cs.cc.useTidbResult {
+		return trs, terr
+	}
+	return mrs, merr
+}
+
+func (cs *ComboStatement) AppendParam(paramId int, data []byte) error {
+	err := cs.ts.AppendParam(paramId, data)
+	if err != nil {
+		return err
+	}
+	return cs.ms.AppendParam(paramId, data)
+}
+
+func (cs *ComboStatement) NumParams() int {
+	if cs.cc.useTidbResult {
+		return cs.ts.NumParams()
+	} else {
+		return cs.ms.NumParams()
+	}
+}
+
+func (cs *ComboStatement) BoundParams() [][]byte {
+	if cs.cc.useTidbResult {
+		return cs.ts.BoundParams()
+	} else {
+		return cs.ms.BoundParams()
+	}
+}
+
+func (cs *ComboStatement) Reset() {
+	cs.ts.Reset()
+	cs.ms.Reset()
+}
+
+func (cs *ComboStatement) Close() error {
+	cs.ts.Close()
+	cs.ms.Close()
+	delete(cs.cc.stmts, cs.ID())
+	return nil
 }
 
 func NewComboDriver(useTidbResult bool) *ComboDriver {
@@ -120,6 +214,7 @@ func (cd *ComboDriver) OpenCtx(capability uint32, collation uint8, dbname string
 		mc:            mc,
 		tc:            tc,
 		useTidbResult: cd.UseTidbResult,
+		stmts:         make(map[int]IStatement),
 	}
 	return comCtx, nil
 }
@@ -192,21 +287,79 @@ func (cc *ComboContext) Execute(sql string) (rs *ResultSet, err error) {
 	return mrs, merr
 }
 
+type PrepareCompare struct {
+	sql      string
+	mColumns []*ColumnInfo
+	tColumns []*ColumnInfo
+	mParams  []*ColumnInfo
+	tParams  []*ColumnInfo
+	mErr     error
+	tErr     error
+}
+
+func (pc *PrepareCompare) String() string {
+	s := "diff for prepare " + pc.sql + ":\n"
+	if len(pc.tParams) != len(pc.mParams) {
+		s += fmt.Sprintf("expect params count %d, got %d\n", len(pc.mParams), len(pc.tParams))
+		return s
+	}
+	for i, tParam := range pc.tParams {
+		mParam := pc.mParams[i]
+		if tParam.Type != mParam.Type {
+			s += fmt.Sprintf("expect param %d type %d, got %d\n", i, mParam.Type, tParam.Type)
+			return s
+		}
+	}
+	if pc.mErr == nil && pc.tErr != nil {
+		s += fmt.Sprintf("expect nil error, got %s\n", pc.tErr.Error())
+		return s
+	} else if pc.mErr != nil && pc.tErr == nil {
+		s += fmt.Sprintf("expected err %s, got nil error\n", pc.mErr)
+		return s
+	}
+	if errors2.ErrorNotEqual(pc.mErr, pc.tErr) {
+		s += fmt.Sprintf("expected err %s, got %s\n", pc.mErr, pc.tErr)
+		return s
+	}
+	return ""
+}
+
 func (cc *ComboContext) Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error) {
+	mStatement, mColumns, mParams, mErr := cc.mc.Prepare(sql)
+	tStatement, tColumns, tParams, tErr := cc.tc.Prepare(sql)
+	prepareCompare := &PrepareCompare{
+		sql:      sql,
+		mColumns: mColumns,
+		tColumns: tColumns,
+		mParams:  mParams,
+		tParams:  tParams,
+		mErr:     mErr,
+		tErr:     tErr,
+	}
+
+	compStr := prepareCompare.String()
+	if compStr != "" {
+		log.Warning(compStr)
+	}
+	comboStmt := &ComboStatement{
+		cc:  cc,
+		sql: sql,
+		ms:  mStatement,
+		ts:  tStatement,
+	}
+	statement = comboStmt
 	if cc.useTidbResult {
-		statement, columns, params, err = cc.tc.Prepare(sql)
+		cc.stmts[tStatement.ID()] = comboStmt
+		columns, params, err = tColumns, tParams, tErr
 	} else {
-		statement, columns, params, err = cc.mc.Prepare(sql)
+		cc.stmts[mStatement.ID()] = comboStmt
+		columns, params, err = mColumns, mParams, mErr
 	}
 	return
 }
 
 func (cc *ComboContext) GetStatement(stmtId int) IStatement {
-	if cc.useTidbResult {
-		return cc.tc.GetStatement(stmtId)
-	} else {
-		return cc.mc.GetStatement(stmtId)
-	}
+	return cc.stmts[stmtId]
 }
 
 func (cc *ComboContext) FieldList(tableName, wildCard string) (columns []*ColumnInfo, err error) {

@@ -175,7 +175,7 @@ func runTestPreparedString(t *C) {
 	runTests(t, dsn, func(dbt *DBTest) {
 		dbt.mustExec("create table test (a text)")
 		dbt.mustExec("insert test values (?)", "abc")
-		rows := dbt.mustQuery("select * from test")
+		rows := dbt.mustQuery("select * from test where 1 = ?", 1)
 		t.Assert(rows.Next(), Equals, true)
 		var out string
 		err := rows.Scan(&out)
