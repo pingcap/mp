@@ -18,7 +18,8 @@ var _ = Suite(&ComboTestSuite{})
 func (ts *ComboTestSuite) SetUpSuite(c *C) {
 	tidb.RemoveDatabase()
 	tidb.NewDatabase()
-	ts.driver = NewComboDriver(false)
+	CreateTidbTestDatabase()
+	ts.driver = NewComboDriver(true)
 	cfg := &etc.Config{
 		Addr:     ":4000",
 		User:     "root",
@@ -40,4 +41,9 @@ func (ts *ComboTestSuite) TestT(c *C) {
 	if regression {
 		runTestRegression(c)
 	}
+}
+
+func (ts *ComboTestSuite) TestPreparedString(c *C) {
+	runTestPreparedString(c)
+	runTestSpecialType(c)
 }

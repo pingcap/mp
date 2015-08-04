@@ -343,7 +343,7 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 			}
 
 			if !isNull {
-				values[i] = v
+				values[i] = hack.String(v)
 				continue
 			} else {
 				values[i] = nil
