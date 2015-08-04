@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ngaut/log"
+	"github.com/pingcap/tidb/types"
 	"github.com/reborndb/go/errors2"
 	"reflect"
 )
@@ -44,7 +45,7 @@ func (d *Compare) String() string {
 		for i, mCol := range mysqlRset.Columns {
 			tCol := tidbRset.Columns[i]
 			if mCol.Type != tCol.Type {
-				s += fmt.Sprintf("expect column %s type %d, got %d\n", mCol.Name, mCol.Type, tCol.Type)
+				s += fmt.Sprintf("expect column %s type %s, got %s\n", mCol.Name, types.TypeStr(mCol.Type), types.TypeStr(tCol.Type))
 				return s
 			}
 			if mCol.ColumnLength != tCol.ColumnLength {
@@ -306,7 +307,7 @@ func (pc *PrepareCompare) String() string {
 	for i, tParam := range pc.tParams {
 		mParam := pc.mParams[i]
 		if tParam.Type != mParam.Type {
-			s += fmt.Sprintf("expect param %d type %d, got %d\n", i, mParam.Type, tParam.Type)
+			s += fmt.Sprintf("expect param %d type %s, got %s\n", i, types.TypeStr(mParam.Type), types.TypeStr(tParam.Type))
 			return s
 		}
 	}
@@ -338,7 +339,7 @@ func (cc *ComboContext) Prepare(sql string) (statement IStatement, columns, para
 	}
 
 	compStr := prepareCompare.String()
-	if compStr != "" {
+	if len(compStr) != 0 {
 		log.Warning(compStr)
 	}
 	comboStmt := &ComboStatement{
