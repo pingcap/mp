@@ -398,6 +398,9 @@ func (cc *ClientConn) writeResultset(rs *ResultSet, binary bool) error {
 	if err := cc.writeEOF(); err != nil {
 		return errors.Trace(err)
 	}
+	if len(rs.Columns) > 2 && rs.Columns[2].Name == "s_dist_01" {
+		log.Debug(fmt.Sprintf("[MP] row numbers %d", len(data)))
+	}
 	for _, row := range rs.Rows {
 		data = data[0:4]
 		if binary {
@@ -428,6 +431,9 @@ func (cc *ClientConn) writeResultset(rs *ResultSet, binary bool) error {
 	err := cc.writeEOF()
 	if err != nil {
 		return errors.Trace(err)
+	}
+	if len(rs.Columns) > 2 && rs.Columns[2].Name == "s_dist_01" {
+		log.Debug("[MP] write over")
 	}
 
 	return errors.Trace(cc.flush())

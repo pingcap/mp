@@ -10,6 +10,7 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
+	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mysqldef"
 )
@@ -390,7 +391,30 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 	return values, err
 }
 
+func uniformValue(value interface{}) interface{} {
+	switch v := value.(type) {
+	case int8:
+		return int64(v)
+	case int16:
+		return int64(v)
+	case int32:
+		return int64(v)
+	case int64:
+		return int64(v)
+	case uint8:
+		return uint64(v)
+	case uint16:
+		return uint64(v)
+	case uint32:
+		return uint64(v)
+	case uint64:
+		return uint64(v)
+	}
+	return value
+}
+
 func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row []interface{}) (data []byte, err error) {
+	log.Debug(fmt.Sprintf("[MP] dump row data"))
 	if len(columns) != len(row) {
 		err = ErrMalformPacket
 		return
@@ -407,7 +431,13 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 	}
 	data = append(data, nulls...)
 	for i, val := range row {
+		val = uniformValue(val)
 		switch v := val.(type) {
+		case int16:
+			switch columns[i].Type {
+			case TypeShort:
+				data = append(data, dumpUint16(uint16(v))...)
+			}
 		case int64:
 			switch columns[i].Type {
 			case TypeTiny:
@@ -437,9 +467,23 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 			floatBits := math.Float64bits(val.(float64))
 			data = append(data, dumpUint64(floatBits)...)
 		case string:
-			data = append(data, dumpLengthEncodedString(hack.Slice(v), alloc)...)
+			ci := columns[i]
+			if ci.Name == "s_dist_01" {
+				tmpd := dumpLengthEncodedString(hack.Slice(v), alloc)
+				log.Debug(fmt.Sprintf("[MP][string][newword] %s, %s, len(v)=%d, len(tmpd)=%d, lengthEncode=%d", ci.Name, v, len(v), len(tmpd), tmpd[0]))
+				data = append(data, tmpd...)
+			} else {
+				data = append(data, dumpLengthEncodedString(hack.Slice(v), alloc)...)
+			}
 		case []byte:
-			data = append(data, dumpLengthEncodedString(v, alloc)...)
+			ci := columns[i]
+			if ci.Name == "s_dist_01" {
+				tmpd := dumpLengthEncodedString(v, alloc)
+				log.Debug(fmt.Sprintf("[MP][bytearray][newword] %s, %s, len(v)=%d, len(tmpd)=%d, lengthEncode=%d", ci.Name, v, len(v), len(tmpd), tmpd[0]))
+				data = append(data, tmpd...)
+			} else {
+				data = append(data, dumpLengthEncodedString(v, alloc)...)
+			}
 		case Time:
 			data = append(data, dumpBinaryDateTime(v, nil)...)
 		case Duration:

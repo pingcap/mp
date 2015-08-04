@@ -40,7 +40,9 @@ func (ts *TidbStatement) Execute(args ...interface{}) (rs *ResultSet, err error)
 			args[i] = types.IdealFloat(v)
 		}
 	}
+	log.Debug("[MP] before execute")
 	tidbRecordset, err := ts.ctx.session.ExecutePreparedStmt(ts.id, args...)
+	log.Debug("[MP] after execute")
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +133,9 @@ func (tc *TidbContext) WarningCount() uint16 {
 }
 
 func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
+	log.Debug("[MP] before execute")
 	qrsList, err := tc.session.Execute(sql)
+	log.Debug("[MP] after execute")
 	if err != nil {
 		return
 	}
@@ -144,13 +148,17 @@ func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
 	if err != nil {
 		return
 	}
+	log.Debug("[MP] execute 1")
 	for _, v := range fields {
 		rs.Columns = append(rs.Columns, convertColumnInfo(v))
 	}
+	log.Debug("[MP] execute 2")
 	rs.Rows, err = qrs.Rows(-1, 0)
+	log.Debug("[MP] execute 3")
 	if err != nil {
 		return
 	}
+	log.Debug("[MP] execute 4")
 	return
 }
 
