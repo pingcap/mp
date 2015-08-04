@@ -143,15 +143,14 @@ func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
 		return
 	}
 	qrs := qrsList[0]
+
 	rs = new(ResultSet)
+	log.Debug("[MP] execute 1")
 	fields, err := qrs.Fields()
 	if err != nil {
 		return
 	}
-	log.Debug("[MP] execute 1")
-	for _, v := range fields {
-		rs.Columns = append(rs.Columns, convertColumnInfo(v))
-	}
+
 	log.Debug("[MP] execute 2")
 	rs.Rows, err = qrs.Rows(-1, 0)
 	log.Debug("[MP] execute 3")
@@ -159,6 +158,13 @@ func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
 		return
 	}
 	log.Debug("[MP] execute 4")
+	fields, err = qrs.Fields()
+	if err != nil {
+		return
+	}
+	for _, v := range fields {
+		rs.Columns = append(rs.Columns, convertColumnInfo(v))
+	}
 	return
 }
 

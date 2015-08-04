@@ -447,6 +447,7 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 			case TypeInt24, TypeLong:
 				data = append(data, dumpUint32(uint32(v))...)
 			case TypeLonglong:
+				log.Debug("[MP] dump Longlong", v)
 				data = append(data, dumpUint64(uint64(v))...)
 			}
 		case uint64:
