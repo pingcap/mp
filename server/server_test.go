@@ -173,13 +173,14 @@ func runTestSpecialType(t *C) {
 
 func runTestPreparedString(t *C) {
 	runTests(t, dsn, func(dbt *DBTest) {
-		dbt.mustExec("create table test (a text)")
-		dbt.mustExec("insert test values (?)", "abc")
+		dbt.mustExec("create table test (a char(10), b char(10))")
+		dbt.mustExec("insert test values (?, ?)", "abcdeabcde", "abcde")
 		rows := dbt.mustQuery("select * from test where 1 = ?", 1)
 		t.Assert(rows.Next(), Equals, true)
-		var out string
-		err := rows.Scan(&out)
+		var outA, outB string
+		err := rows.Scan(&outA, &outB)
 		t.Assert(err, IsNil)
-		t.Assert(out, Equals, "abc")
+		t.Assert(outA, Equals, "abcdeabcde")
+		t.Assert(outB, Equals, "abcde")
 	})
 }

@@ -18,7 +18,7 @@ var _ = Suite(&ComboTestSuite{})
 func (ts *ComboTestSuite) SetUpSuite(c *C) {
 	tidb.RemoveDatabase()
 	tidb.NewDatabase()
-	CreateQlTestDatabase()
+	CreateTidbTestDatabase()
 	ts.driver = NewComboDriver(true)
 	cfg := &etc.Config{
 		Addr:     ":4000",
