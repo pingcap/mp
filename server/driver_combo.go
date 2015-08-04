@@ -342,6 +342,11 @@ func (cc *ComboContext) Prepare(sql string) (statement IStatement, columns, para
 	if len(compStr) != 0 {
 		log.Warning(compStr)
 	}
+	if mErr == nil && tErr != nil {
+		// both prepare must be executed successfully, or we will get panic later.
+		err = tErr
+		return
+	}
 	comboStmt := &ComboStatement{
 		cc:  cc,
 		sql: sql,
