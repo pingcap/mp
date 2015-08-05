@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/ngaut/log"
 	. "github.com/pingcap/mysqldef"
 	"github.com/pingcap/tidb"
@@ -40,9 +42,7 @@ func (ts *TidbStatement) Execute(args ...interface{}) (rs *ResultSet, err error)
 			args[i] = types.IdealFloat(v)
 		}
 	}
-	log.Debug("[MP] before execute")
 	tidbRecordset, err := ts.ctx.session.ExecutePreparedStmt(ts.id, args...)
-	log.Debug("[MP] after execute")
 	if err != nil {
 		return nil, err
 	}
@@ -54,10 +54,14 @@ func (ts *TidbStatement) Execute(args ...interface{}) (rs *ResultSet, err error)
 	if err != nil {
 		return
 	}
+	rs.Rows, err = tidbRecordset.Rows(-1, 0)
+	fields, err = tidbRecordset.Fields()
+	if err != nil {
+		return
+	}
 	for _, v := range fields {
 		rs.Columns = append(rs.Columns, convertColumnInfo(v))
 	}
-	rs.Rows, err = tidbRecordset.Rows(-1, 0)
 	if err != nil {
 		return
 	}
@@ -133,9 +137,7 @@ func (tc *TidbContext) WarningCount() uint16 {
 }
 
 func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
-	log.Debug("[MP] before execute")
 	qrsList, err := tc.session.Execute(sql)
-	log.Debug("[MP] after execute")
 	if err != nil {
 		return
 	}
@@ -145,19 +147,15 @@ func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
 	qrs := qrsList[0]
 
 	rs = new(ResultSet)
-	log.Debug("[MP] execute 1")
 	fields, err := qrs.Fields()
 	if err != nil {
 		return
 	}
 
-	log.Debug("[MP] execute 2")
 	rs.Rows, err = qrs.Rows(-1, 0)
-	log.Debug("[MP] execute 3")
 	if err != nil {
 		return
 	}
-	log.Debug("[MP] execute 4")
 	fields, err = qrs.Fields()
 	if err != nil {
 		return

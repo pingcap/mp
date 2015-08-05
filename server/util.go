@@ -409,12 +409,12 @@ func uniformValue(value interface{}) interface{} {
 		return uint64(v)
 	case uint64:
 		return uint64(v)
+	default:
+		return value
 	}
-	return value
 }
 
 func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row []interface{}) (data []byte, err error) {
-	log.Debug(fmt.Sprintf("[MP] dump row data"))
 	if len(columns) != len(row) {
 		err = ErrMalformPacket
 		return
@@ -447,8 +447,10 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 			case TypeInt24, TypeLong:
 				data = append(data, dumpUint32(uint32(v))...)
 			case TypeLonglong:
-				log.Debug("[MP] dump Longlong", v)
 				data = append(data, dumpUint64(uint64(v))...)
+			default:
+				//TODO: dump other type
+				log.Debug("[MP]", columns[i].Type)
 			}
 		case uint64:
 			switch columns[i].Type {
@@ -469,22 +471,10 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 			data = append(data, dumpUint64(floatBits)...)
 		case string:
 			ci := columns[i]
-			if ci.Name == "s_dist_01" {
-				tmpd := dumpLengthEncodedString(hack.Slice(v), alloc)
-				log.Debug(fmt.Sprintf("[MP][string][newword] %s, %s, len(v)=%d, len(tmpd)=%d, lengthEncode=%d", ci.Name, v, len(v), len(tmpd), tmpd[0]))
-				data = append(data, tmpd...)
-			} else {
-				data = append(data, dumpLengthEncodedString(hack.Slice(v), alloc)...)
-			}
+			data = append(data, dumpLengthEncodedString(hack.Slice(v), alloc)...)
 		case []byte:
 			ci := columns[i]
-			if ci.Name == "s_dist_01" {
-				tmpd := dumpLengthEncodedString(v, alloc)
-				log.Debug(fmt.Sprintf("[MP][bytearray][newword] %s, %s, len(v)=%d, len(tmpd)=%d, lengthEncode=%d", ci.Name, v, len(v), len(tmpd), tmpd[0]))
-				data = append(data, tmpd...)
-			} else {
-				data = append(data, dumpLengthEncodedString(v, alloc)...)
-			}
+			data = append(data, dumpLengthEncodedString(v, alloc)...)
 		case Time:
 			data = append(data, dumpBinaryDateTime(v, nil)...)
 		case Duration:
