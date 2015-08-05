@@ -227,7 +227,7 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	return
 }
 
-func CreateQlTestDatabase() {
+func CreateTidbTestDatabase() {
 	td := &TidbDriver{}
 	tc, err := td.OpenCtx(DefaultCapability, DefaultCollationID, "")
 	if err != nil {

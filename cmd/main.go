@@ -31,7 +31,7 @@ func main() {
 
 	log.SetLevelByString(cfg.LogLevel)
 	tidb.NewDatabase()
-	server.CreateQlTestDatabase()
+	server.CreateTidbTestDatabase()
 	var svr *server.Server
 	var driver server.IDriver
 	switch env("MP_DRIVER", "tidb") {

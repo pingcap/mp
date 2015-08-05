@@ -18,7 +18,7 @@ var _ = Suite(new(TidbTestSuite))
 func (ts *TidbTestSuite) SetUpSuite(c *C) {
 	tidb.RemoveDatabase()
 	tidb.NewDatabase()
-	CreateQlTestDatabase()
+	CreateTidbTestDatabase()
 	ts.tidbdrv = &TidbDriver{}
 	cfg := &etc.Config{
 		Addr:     ":4000",
