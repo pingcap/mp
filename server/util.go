@@ -390,6 +390,29 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 	return values, err
 }
 
+func uniformValue(value interface{}) interface{} {
+	switch v := value.(type) {
+	case int8:
+		return int64(v)
+	case int16:
+		return int64(v)
+	case int32:
+		return int64(v)
+	case int64:
+		return int64(v)
+	case uint8:
+		return uint64(v)
+	case uint16:
+		return uint64(v)
+	case uint32:
+		return uint64(v)
+	case uint64:
+		return uint64(v)
+	default:
+		return value
+	}
+}
+
 func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row []interface{}) (data []byte, err error) {
 	if len(columns) != len(row) {
 		err = ErrMalformPacket
@@ -407,6 +430,7 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 	}
 	data = append(data, nulls...)
 	for i, val := range row {
+		val = uniformValue(val)
 		switch v := val.(type) {
 		case int64:
 			switch columns[i].Type {
