@@ -470,10 +470,8 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 			floatBits := math.Float64bits(val.(float64))
 			data = append(data, dumpUint64(floatBits)...)
 		case string:
-			ci := columns[i]
 			data = append(data, dumpLengthEncodedString(hack.Slice(v), alloc)...)
 		case []byte:
-			ci := columns[i]
 			data = append(data, dumpLengthEncodedString(v, alloc)...)
 		case Time:
 			data = append(data, dumpBinaryDateTime(v, nil)...)

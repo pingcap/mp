@@ -1,8 +1,6 @@
 package server
 
 import (
-	"fmt"
-
 	"github.com/ngaut/log"
 	. "github.com/pingcap/mysqldef"
 	"github.com/pingcap/tidb"
