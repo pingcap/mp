@@ -1,12 +1,10 @@
 - Run
 
-	    cd cmd
-	    go build && ./cmd
+	    go run cmd/main.go -mode=<run mode> -myaddr=<mysql address>
 
 - Test with official mysql client
 
-	    mysql -h 127.0.0.1 -P 4000
-
+	    mysql -h 127.0.0.1 -P 4000 -D test
 
 - Test with go mysql driver
 

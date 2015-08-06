@@ -15,7 +15,7 @@ type MysqlTestSuite struct {
 var _ = Suite(&MysqlTestSuite{})
 
 func (ts *MysqlTestSuite) SetUpSuite(c *C) {
-	ts.driver = &MysqlDriver{}
+	ts.driver = &MysqlDriver{Addr: "127.0.0.1:3306"}
 	cfg := &etc.Config{
 		Addr:     ":4000",
 		User:     "root",

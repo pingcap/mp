@@ -19,7 +19,7 @@ func (ts *ComboTestSuite) SetUpSuite(c *C) {
 	tidb.RemoveDatabase()
 	tidb.NewDatabase()
 	CreateTidbTestDatabase()
-	ts.driver = NewComboDriver(true)
+	ts.driver = NewComboDriver(true, &MysqlDriver{Addr: "127.0.0.1:3306"})
 	cfg := &etc.Config{
 		Addr:     ":4000",
 		User:     "root",

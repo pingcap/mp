@@ -13,7 +13,10 @@ import (
 	. "github.com/pingcap/mysqldef"
 )
 
-type MysqlDriver struct{}
+type MysqlDriver struct {
+	Addr string
+	Pass string
+}
 
 type MysqlStatement struct {
 	mConn       *MysqlConn
@@ -54,7 +57,7 @@ func (md *MysqlDriver) OpenCtx(capability uint32, collation uint8, dbname string
 	mc.stmts = make(map[int]*MysqlStatement)
 	mc.capability = capability & DefaultCapability
 	mc.collation = collation
-	err = mc.connect(":3306", "root", "", dbname)
+	err = mc.connect(md.Addr, "root", md.Pass, dbname)
 	if err != nil {
 		return nil, err
 	}
