@@ -8,6 +8,9 @@ import (
 // no copy to change slice to string
 // use your own risk
 func String(b []byte) (s string) {
+	if len(b) == 0 {
+		return ""
+	}
 	pbytes := (*reflect.SliceHeader)(unsafe.Pointer(&b))
 	pstring := (*reflect.StringHeader)(unsafe.Pointer(&s))
 	pstring.Data = pbytes.Data

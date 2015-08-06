@@ -52,10 +52,14 @@ func (ts *TidbStatement) Execute(args ...interface{}) (rs *ResultSet, err error)
 	if err != nil {
 		return
 	}
+	rs.Rows, err = tidbRecordset.Rows(-1, 0)
+	fields, err = tidbRecordset.Fields()
+	if err != nil {
+		return
+	}
 	for _, v := range fields {
 		rs.Columns = append(rs.Columns, convertColumnInfo(v))
 	}
-	rs.Rows, err = tidbRecordset.Rows(-1, 0)
 	if err != nil {
 		return
 	}
@@ -144,12 +148,17 @@ func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
 	if err != nil {
 		return
 	}
-	for _, v := range fields {
-		rs.Columns = append(rs.Columns, convertColumnInfo(v))
-	}
+
 	rs.Rows, err = qrs.Rows(-1, 0)
 	if err != nil {
 		return
+	}
+	fields, err = qrs.Fields()
+	if err != nil {
+		return
+	}
+	for _, v := range fields {
+		rs.Columns = append(rs.Columns, convertColumnInfo(v))
 	}
 	return
 }
