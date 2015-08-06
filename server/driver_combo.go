@@ -11,6 +11,8 @@ import (
 
 type ComboDriver struct {
 	UseTidbResult bool // if true use the result from ql, otherwise the result from mysql will be used.
+	tidbDriver    IDriver
+	mysqlDriver   IDriver
 }
 
 type ResultDesc struct {
@@ -194,20 +196,20 @@ func (cs *ComboStatement) Close() error {
 	return nil
 }
 
-func NewComboDriver(useTidbResult bool) *ComboDriver {
+func NewComboDriver(useTidbResult bool, myDriver IDriver) *ComboDriver {
 	return &ComboDriver{
 		UseTidbResult: useTidbResult,
+		mysqlDriver:   myDriver,
+		tidbDriver:    &TidbDriver{},
 	}
 }
 
 func (cd *ComboDriver) OpenCtx(capability uint32, collation uint8, dbname string) (IContext, error) {
-	md := &MysqlDriver{}
-	mc, err := md.OpenCtx(capability, collation, dbname)
+	mc, err := cd.mysqlDriver.OpenCtx(capability, collation, dbname)
 	if err != nil {
 		return nil, err
 	}
-	td := &TidbDriver{}
-	tc, err := td.OpenCtx(capability, collation, dbname)
+	tc, err := cd.tidbDriver.OpenCtx(capability, collation, dbname)
 	if err != nil {
 		return nil, err
 	}
