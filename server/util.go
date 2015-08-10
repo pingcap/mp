@@ -344,7 +344,7 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 			}
 
 			if !isNull {
-				values[i] = hack.String(v)
+				values[i] = v
 				continue
 			} else {
 				values[i] = nil
@@ -476,7 +476,7 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 		case Time:
 			data = append(data, dumpBinaryDateTime(v, nil)...)
 		case time.Time:
-			myTime := Time{v, columns[i].Type}
+			myTime := Time{v, columns[i].Type, DefaultFsp}
 			data = append(data, dumpBinaryDateTime(myTime, nil)...)
 		case Duration:
 			data = append(data, dumpBinaryTime(time.Duration(v))...)
@@ -574,7 +574,7 @@ func dumpTextValue(mysqlType uint8, value interface{}) ([]byte, error) {
 	case Time:
 		return hack.Slice(v.String()), nil
 	case Duration:
-		return hack.Slice(v.String()), nil
+		return hack.Slice(v.String(DefaultFsp)), nil
 	case Decimal:
 		return hack.Slice(v.String()), nil
 	default:

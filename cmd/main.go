@@ -6,18 +6,18 @@ import (
 	"runtime"
 	"syscall"
 
+	"flag"
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/etc"
 	"github.com/pingcap/mp/server"
 	"github.com/pingcap/tidb"
 )
 
-func env(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
+var (
+	mysqlAddr = flag.String("myaddr", "127.0.0.1:3306", "mysql address")
+	mysqlPass = flag.String("mypass", "", "mysql password")
+	runMode   = flag.String("mode", "combotidb", "tidb(tidb only)/mysql(mysql only)/combotidb(combo use tidb result)/combo(combo use mysql result)")
+)
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -28,21 +28,25 @@ func main() {
 		Password: "",
 		LogLevel: "debug",
 	}
-
+	flag.Parse()
 	log.SetLevelByString(cfg.LogLevel)
 	tidb.NewDatabase()
 	server.CreateTidbTestDatabase()
 	var svr *server.Server
 	var driver server.IDriver
-	switch env("MP_DRIVER", "tidb") {
+	var myDriver = &server.MysqlDriver{
+		Addr: *mysqlAddr,
+		Pass: *mysqlPass,
+	}
+	switch *runMode {
 	case "tidb":
 		driver = &server.TidbDriver{}
 	case "mysql":
-		driver = &server.MysqlDriver{}
+		driver = myDriver
 	case "combotidb":
-		driver = server.NewComboDriver(true)
+		driver = server.NewComboDriver(true, myDriver)
 	case "combo":
-		driver = server.NewComboDriver(false)
+		driver = server.NewComboDriver(false, myDriver)
 	}
 	svr, err := server.NewServer(cfg, driver)
 	if err != nil {

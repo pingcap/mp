@@ -193,14 +193,12 @@ func (cc *ClientConn) readHandshakeResponse() error {
 func (cc *ClientConn) Run() {
 	defer func() {
 		r := recover()
-		if err, ok := r.(error); ok {
+		if r != nil {
 			const size = 4096
 			buf := make([]byte, size)
 			buf = buf[:runtime.Stack(buf, false)]
-
-			log.Errorf("lastCmd %s, %v, %s", cc.lastCmd, err, buf)
+			log.Errorf("lastCmd %s, %v, %s", cc.lastCmd, r, buf)
 		}
-
 		cc.Close()
 	}()
 
