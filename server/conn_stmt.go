@@ -241,7 +241,7 @@ func parseStmtArgs(args []interface{}, boundParams [][]byte, nullBitmap, paramTy
 			TypeMediumBlob, TypeLongBlob, TypeBlob,
 			TypeVarString, TypeString, TypeGeometry,
 			TypeDate, TypeNewDate,
-			TypeTimestamp, TypeDatetime, TypeTime:
+			TypeTimestamp, TypeDatetime, TypeDuration:
 			if len(paramValues) < (pos + 1) {
 				err = ErrMalformPacket
 				return

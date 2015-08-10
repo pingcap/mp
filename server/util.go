@@ -368,7 +368,7 @@ func parseRowValuesBinary(columns []*ColumnInfo, rowData []byte) ([]interface{},
 				return nil, err
 			}
 			continue
-		case TypeTime:
+		case TypeDuration:
 			var num uint64
 			num, isNull, n = parseLengthEncodedInt(rowData[pos:])
 
@@ -518,7 +518,7 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 				}
 			case TypeFloat, TypeDouble:
 				values[i], err = strconv.ParseFloat(hack.String(v), 64)
-			case TypeDate, TypeNewDate, TypeDatetime, TypeTimestamp, TypeTime:
+			case TypeDate, TypeNewDate, TypeDatetime, TypeTimestamp, TypeDuration:
 				values[i] = hack.String(v)
 			case TypeYear:
 				values[i], err = ParseYear(hack.String(v))
