@@ -13,6 +13,7 @@ import (
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mysqldef"
+	"github.com/pingcap/tidb/types"
 )
 
 func parseLengthEncodedInt(b []byte) (num uint64, isNull bool, n int) {
@@ -550,6 +551,8 @@ func dumpTextValue(mysqlType uint8, value interface{}) ([]byte, error) {
 	case int32:
 		return strconv.AppendInt(nil, int64(v), 10), nil
 	case int64:
+		return strconv.AppendInt(nil, int64(v), 10), nil
+	case types.IdealInt:
 		return strconv.AppendInt(nil, int64(v), 10), nil
 	case int:
 		return strconv.AppendInt(nil, int64(v), 10), nil
