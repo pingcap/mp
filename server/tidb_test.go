@@ -16,10 +16,10 @@ type TidbTestSuite struct {
 var _ = Suite(new(TidbTestSuite))
 
 func (ts *TidbTestSuite) SetUpSuite(c *C) {
-	tidb.RemoveDatabase()
-	tidb.NewDatabase()
-	CreateTidbTestDatabase()
-	ts.tidbdrv = &TidbDriver{}
+	store, err := tidb.NewStore("goleveldb:///tmp/tidb")
+	c.Assert(err, IsNil)
+	CreateTidbTestDatabase(store)
+	ts.tidbdrv = NewTidbDriver(store)
 	cfg := &etc.Config{
 		Addr:     ":4000",
 		User:     "root",

@@ -2,11 +2,12 @@ package server
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/ngaut/log"
+	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/types"
 	"github.com/reborndb/go/errors2"
-	"reflect"
 )
 
 type ComboDriver struct {
@@ -196,11 +197,11 @@ func (cs *ComboStatement) Close() error {
 	return nil
 }
 
-func NewComboDriver(useTidbResult bool, myDriver IDriver) *ComboDriver {
+func NewComboDriver(useTidbResult bool, myDriver IDriver, store kv.Storage) *ComboDriver {
 	return &ComboDriver{
 		UseTidbResult: useTidbResult,
 		mysqlDriver:   myDriver,
-		tidbDriver:    &TidbDriver{},
+		tidbDriver:    NewTidbDriver(store),
 	}
 }
 

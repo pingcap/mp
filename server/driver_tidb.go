@@ -5,10 +5,20 @@ import (
 	. "github.com/pingcap/mysqldef"
 	"github.com/pingcap/tidb"
 	"github.com/pingcap/tidb/field"
+	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/types"
 )
 
-type TidbDriver struct{}
+type TidbDriver struct {
+	store kv.Storage
+}
+
+func NewTidbDriver(store kv.Storage) *TidbDriver {
+	driver := &TidbDriver{
+		store: store,
+	}
+	return driver
+}
 
 type TidbContext struct {
 	session      tidb.Session
@@ -99,7 +109,7 @@ func (ms *TidbStatement) Close() error {
 }
 
 func (qd *TidbDriver) OpenCtx(capability uint32, collation uint8, dbname string) (IContext, error) {
-	session, _ := tidb.CreateSession()
+	session, _ := tidb.CreateSession(qd.store)
 	if dbname != "" {
 		_, err := session.Execute("use " + dbname)
 		if err != nil {
@@ -224,8 +234,8 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	return
 }
 
-func CreateTidbTestDatabase() {
-	td := &TidbDriver{}
+func CreateTidbTestDatabase(store kv.Storage) {
+	td := NewTidbDriver(store)
 	tc, err := td.OpenCtx(DefaultCapability, DefaultCollationID, "")
 	if err != nil {
 		log.Fatal(err)

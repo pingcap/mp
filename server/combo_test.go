@@ -16,10 +16,10 @@ type ComboTestSuite struct {
 var _ = Suite(&ComboTestSuite{})
 
 func (ts *ComboTestSuite) SetUpSuite(c *C) {
-	tidb.RemoveDatabase()
-	tidb.NewDatabase()
-	CreateTidbTestDatabase()
-	ts.driver = NewComboDriver(true, &MysqlDriver{Addr: "127.0.0.1:3306"})
+	store, err := tidb.NewStore("goleveldb:///tmp/tidb")
+	c.Assert(err, IsNil)
+	CreateTidbTestDatabase(store)
+	ts.driver = NewComboDriver(true, &MysqlDriver{Addr: "127.0.0.1:3306"}, store)
 	cfg := &etc.Config{
 		Addr:     ":4000",
 		User:     "root",
