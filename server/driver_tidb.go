@@ -153,6 +153,7 @@ func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
 		return
 	}
 	qrs := qrsList[0]
+
 	rs = new(ResultSet)
 	fields, err := qrs.Fields()
 	if err != nil {

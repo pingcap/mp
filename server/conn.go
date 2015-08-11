@@ -214,6 +214,7 @@ func (cc *ClientConn) Run() {
 
 		if err := cc.dispatch(data); err != nil {
 			log.Errorf("dispatch error %s, %s", errors.ErrorStack(err), cc)
+			log.Errorf("cmd: %s", string(data[1:]))
 			if err != ErrBadConn { //todo: fix this
 				cc.writeError(err)
 			}
