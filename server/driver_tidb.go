@@ -110,6 +110,7 @@ func (ms *TidbStatement) Close() error {
 
 func (qd *TidbDriver) OpenCtx(capability uint32, collation uint8, dbname string) (IContext, error) {
 	session, _ := tidb.CreateSession(qd.store)
+	session.SetClientCapability(capability)
 	if dbname != "" {
 		_, err := session.Execute("use " + dbname)
 		if err != nil {
