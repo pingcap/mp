@@ -30,8 +30,12 @@ func main() {
 	}
 	flag.Parse()
 	log.SetLevelByString(cfg.LogLevel)
-	tidb.NewDatabase()
-	server.CreateTidbTestDatabase()
+	store, err := tidb.NewStore("goleveldb:///tmp/tidb")
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+	server.CreateTidbTestDatabase(store)
 	var svr *server.Server
 	var driver server.IDriver
 	var myDriver = &server.MysqlDriver{
@@ -40,15 +44,15 @@ func main() {
 	}
 	switch *runMode {
 	case "tidb":
-		driver = &server.TidbDriver{}
+		driver = server.NewTidbDriver(store)
 	case "mysql":
 		driver = myDriver
 	case "combotidb":
-		driver = server.NewComboDriver(true, myDriver)
+		driver = server.NewComboDriver(true, myDriver, store)
 	case "combo":
-		driver = server.NewComboDriver(false, myDriver)
+		driver = server.NewComboDriver(false, myDriver, store)
 	}
-	svr, err := server.NewServer(cfg, driver)
+	svr, err = server.NewServer(cfg, driver)
 	if err != nil {
 		log.Error(err.Error())
 		return
