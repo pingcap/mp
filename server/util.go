@@ -10,7 +10,6 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
-	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
 	. "github.com/pingcap/mysqldef"
 	"github.com/pingcap/tidb/types"
@@ -434,11 +433,6 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 	for i, val := range row {
 		val = uniformValue(val)
 		switch v := val.(type) {
-		case int16:
-			switch columns[i].Type {
-			case TypeShort:
-				data = append(data, dumpUint16(uint16(v))...)
-			}
 		case int64:
 			switch columns[i].Type {
 			case TypeTiny:
@@ -449,9 +443,6 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 				data = append(data, dumpUint32(uint32(v))...)
 			case TypeLonglong:
 				data = append(data, dumpUint64(uint64(v))...)
-			default:
-				//TODO: dump other type
-				log.Debug("[MP]", columns[i].Type)
 			}
 		case uint64:
 			switch columns[i].Type {
