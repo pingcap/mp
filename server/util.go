@@ -544,6 +544,7 @@ func dumpTextValue(mysqlType uint8, value interface{}) ([]byte, error) {
 	case int64:
 		return strconv.AppendInt(nil, int64(v), 10), nil
 	case types.IdealInt:
+		// TODO: remove this case after we remove IdealXX from tidb
 		return strconv.AppendInt(nil, int64(v), 10), nil
 	case int:
 		return strconv.AppendInt(nil, int64(v), 10), nil
