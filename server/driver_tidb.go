@@ -6,7 +6,7 @@ import (
 	"github.com/pingcap/tidb"
 	"github.com/pingcap/tidb/field"
 	"github.com/pingcap/tidb/kv"
-	"github.com/pingcap/tidb/types"
+	"github.com/pingcap/tidb/util/types"
 )
 
 type TidbDriver struct {
