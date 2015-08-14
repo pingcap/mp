@@ -6,7 +6,7 @@ import (
 
 	"github.com/ngaut/log"
 	"github.com/pingcap/tidb/kv"
-	"github.com/pingcap/tidb/types"
+	"github.com/pingcap/tidb/util/types"
 	"github.com/reborndb/go/errors2"
 )
 
@@ -49,23 +49,18 @@ func (d *Compare) String() string {
 			tCol := tidbRset.Columns[i]
 			if mCol.Type != tCol.Type {
 				s += fmt.Sprintf("expect column %s type %s, got %s\n", mCol.Name, types.TypeStr(mCol.Type), types.TypeStr(tCol.Type))
-				return s
 			}
 			if mCol.ColumnLength != tCol.ColumnLength {
 				s += fmt.Sprintf("expect column %s length %d, got %d\n", mCol.Name, mCol.ColumnLength, tCol.ColumnLength)
-				return s
 			}
 			if mCol.Flag != tCol.Flag {
 				s += fmt.Sprintf("expect column %s flag %d, got %d\n", mCol.Name, mCol.Flag, tCol.Flag)
-				return s
 			}
 			if mCol.Charset != tCol.Charset {
 				s += fmt.Sprintf("expect column %s charset %d, got %d\n", mCol.Name, mCol.Charset, tCol.Charset)
-				return s
 			}
 			if mCol.Decimal != tCol.Decimal {
 				s += fmt.Sprintf("expect column %s charset %d, got %d\n", mCol.Name, mCol.Decimal, tCol.Decimal)
-				return s
 			}
 			//TODO compare more column info
 		}
@@ -96,7 +91,7 @@ func (d *Compare) String() string {
 			return s
 		}
 		if d.lastInsertID[0] != d.lastInsertID[1] {
-			s += fmt.Sprintf("expect last insert ID %d, got %d\n")
+			s += fmt.Sprintf("expect last insert ID %d, got %d\n", d.lastInsertID[0], d.lastInsertID[1])
 			return s
 		}
 	}
