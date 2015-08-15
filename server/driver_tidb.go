@@ -6,7 +6,6 @@ import (
 	"github.com/pingcap/tidb"
 	"github.com/pingcap/tidb/field"
 	"github.com/pingcap/tidb/kv"
-	"github.com/pingcap/tidb/util/types"
 )
 
 type TidbDriver struct {
@@ -39,17 +38,6 @@ func (ts *TidbStatement) ID() int {
 }
 
 func (ts *TidbStatement) Execute(args ...interface{}) (rs *ResultSet, err error) {
-	//TODO: temporary solution for passing test, will change later.
-	for i := range args {
-		switch v := args[i].(type) {
-		case int64:
-			args[i] = types.IdealInt(v)
-		case uint64:
-			args[i] = types.IdealUint(v)
-		case float64:
-			args[i] = types.IdealFloat(v)
-		}
-	}
 	tidbRecordset, err := ts.ctx.session.ExecutePreparedStmt(ts.id, args...)
 	if err != nil {
 		return nil, err
