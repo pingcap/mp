@@ -1,12 +1,13 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 
-	"flag"
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/etc"
 	"github.com/pingcap/mp/server"
@@ -16,19 +17,21 @@ import (
 var (
 	mysqlAddr = flag.String("myaddr", "127.0.0.1:3306", "mysql address")
 	mysqlPass = flag.String("mypass", "", "mysql password")
-	runMode   = flag.String("mode", "combotidb", "tidb(tidb only)/mysql(mysql only)/combotidb(combo use tidb result)/combo(combo use mysql result)")
+	runMode   = flag.String("mode", "tidb", "tidb(tidb only)/mysql(mysql only)/combotidb(combo use tidb result)/combo(combo use mysql result)")
+	port      = flag.String("P", "4000", "mp server port")
+	loglevel  = flag.String("L", "debug", "log level")
 )
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
+	flag.Parse()
 	cfg := &etc.Config{
-		Addr:     ":4000",
+		Addr:     fmt.Sprintf(":%s", *port),
 		User:     "root",
 		Password: "",
-		LogLevel: "debug",
+		LogLevel: *loglevel,
 	}
-	flag.Parse()
+
 	log.SetLevelByString(cfg.LogLevel)
 	store, err := tidb.NewStore("goleveldb:///tmp/tidb")
 	if err != nil {
