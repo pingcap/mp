@@ -1,6 +1,9 @@
 - Run
 
-	    go run cmd/main.go -mode=<run mode> -myaddr=<mysql address>
+	     go run -ldflags \
+		     "-x main.buildstamp=`date -u '+%y-%m-%d_%i:%m:%s%p'` \
+		     -x main.githash=`git rev-parse head`" cmd/main.go \ 
+		     -mode=<run mode> -myaddr=<mysql address>
 
 - Test with official mysql client
 
