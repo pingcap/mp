@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"runtime"
@@ -19,7 +20,14 @@ var (
 	runMode   = flag.String("mode", "combotidb", "tidb(tidb only)/mysql(mysql only)/combotidb(combo use tidb result)/combo(combo use mysql result)")
 )
 
+//version infomation
+var (
+	buildstamp = "No Build Stamp Provided"
+	githash    = "No Git Hash Provided"
+)
+
 func main() {
+	fmt.Printf("Git Commit Hash:%s\nUTC Build Time :%s\n", githash, buildstamp)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	cfg := &etc.Config{
