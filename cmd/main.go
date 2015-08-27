@@ -21,6 +21,7 @@ var (
 	runMode   = flag.String("mode", "combotidb", "tidb(tidb only)/mysql(mysql only)/combotidb(combo use tidb result)/combo(combo use mysql result)")
 	store     = flag.String("store", "goleveldb", "registered store name, [memory, goleveldb, boltdb]")
 	storePath = flag.String("store_path", "/tmp/tidb", "tidb storage path")
+	logLevel  = flag.String("L", "debug", "log level: info, debug, warn, error, fatal")
 )
 
 //version infomation
@@ -33,13 +34,15 @@ func main() {
 	fmt.Printf("Git Commit Hash:%s\nUTC Build Time :%s\n", githash, buildstamp)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	flag.Parse()
+
 	cfg := &etc.Config{
 		Addr:     ":4000",
 		User:     "root",
 		Password: "",
-		LogLevel: "debug",
+		LogLevel: *logLevel,
 	}
-	flag.Parse()
+
 	log.SetLevelByString(cfg.LogLevel)
 	store, err := tidb.NewStore(fmt.Sprintf("%s://%s", *store, *storePath))
 	if err != nil {
