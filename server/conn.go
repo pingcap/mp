@@ -69,6 +69,9 @@ func (cc *ClientConn) Handshake() error {
 }
 
 func (cc *ClientConn) Close() error {
+	cc.server.rwlock.Lock()
+	delete(cc.server.clients, cc.connectionId)
+	cc.server.rwlock.Unlock()
 	cc.conn.Close()
 	return cc.ctx.Close()
 }
@@ -236,9 +239,7 @@ func (cc *ClientConn) dispatch(data []byte) error {
 
 	token := cc.server.GetToken()
 
-	cc.server.GetRWlock().RLock()
 	defer func() {
-		cc.server.GetRWlock().RUnlock()
 		cc.server.ReleaseToken(token)
 	}()
 
