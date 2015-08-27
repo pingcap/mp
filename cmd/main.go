@@ -22,6 +22,7 @@ var (
 	store     = flag.String("store", "goleveldb", "registered store name, [memory, goleveldb, boltdb]")
 	storePath = flag.String("store_path", "/tmp/tidb", "tidb storage path")
 	logLevel  = flag.String("L", "debug", "log level: info, debug, warn, error, fatal")
+	port      = flag.String("P", "4000", "mp server port")
 )
 
 //version infomation
@@ -37,7 +38,7 @@ func main() {
 	flag.Parse()
 
 	cfg := &etc.Config{
-		Addr:     ":4000",
+		Addr:     fmt.Sprintf(":%s", *port),
 		User:     "root",
 		Password: "",
 		LogLevel: *logLevel,
