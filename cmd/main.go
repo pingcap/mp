@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"flag"
+
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/etc"
 	"github.com/pingcap/mp/server"
@@ -18,6 +19,8 @@ var (
 	mysqlAddr = flag.String("myaddr", "127.0.0.1:3306", "mysql address")
 	mysqlPass = flag.String("mypass", "", "mysql password")
 	runMode   = flag.String("mode", "combotidb", "tidb(tidb only)/mysql(mysql only)/combotidb(combo use tidb result)/combo(combo use mysql result)")
+	store     = flag.String("store", "goleveldb", "registered store name, [memory, goleveldb, boltdb]")
+	storePath = flag.String("store_path", "/tmp/tidb", "tidb storage path")
 )
 
 //version infomation
@@ -38,7 +41,7 @@ func main() {
 	}
 	flag.Parse()
 	log.SetLevelByString(cfg.LogLevel)
-	store, err := tidb.NewStore("goleveldb:///tmp/tidb")
+	store, err := tidb.NewStore(fmt.Sprintf("%s://%s", *store, *storePath))
 	if err != nil {
 		log.Error(err.Error())
 		return
