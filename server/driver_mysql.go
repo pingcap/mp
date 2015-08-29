@@ -218,7 +218,7 @@ func (ms *MysqlStatement) Execute(args ...interface{}) (rs *ResultSet, err error
 
 func (ms *MysqlStatement) AppendParam(paramId int, data []byte) (err error) {
 	if paramId >= len(ms.boundParams) {
-		return NewDefaultError(ER_WRONG_ARGUMENTS, "stmt_send_longdata")
+		return NewDefaultError(ErWrongArguments, "stmt_send_longdata")
 	}
 	ms.boundParams[paramId] = append(ms.boundParams[paramId], data...)
 	return
@@ -689,7 +689,7 @@ func (mc *MysqlConn) handleOKPacket(data []byte) (err error) {
 }
 
 func (mc *MysqlConn) handleErrorPacket(data []byte) error {
-	e := new(SqlError)
+	e := new(SQLError)
 
 	var pos int = 1
 

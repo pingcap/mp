@@ -66,7 +66,7 @@ func (ts *TidbStatement) Execute(args ...interface{}) (rs *ResultSet, err error)
 
 func (ts *TidbStatement) AppendParam(paramID int, data []byte) error {
 	if paramID >= len(ts.boundParams) {
-		return NewDefaultError(ER_WRONG_ARGUMENTS, "stmt_send_longdata")
+		return NewDefaultError(ErWrongArguments, "stmt_send_longdata")
 	}
 	ts.boundParams[paramID] = append(ts.boundParams[paramID], data...)
 	return nil
@@ -218,7 +218,7 @@ func convertColumnInfo(qlfield *field.ResultField) (ci *ColumnInfo) {
 	ci.Flag = uint16(qlfield.Flag)
 	ci.Name = qlfield.Name
 	ci.Table = qlfield.TableName
-	ci.Charset = uint16(CharsetIds[qlfield.Charset])
+	ci.Charset = uint16(CharsetIDs[qlfield.Charset])
 	ci.ColumnLength = uint32(qlfield.Flen)
 	ci.Type = uint8(qlfield.Tp)
 	return

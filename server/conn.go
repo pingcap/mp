@@ -178,7 +178,7 @@ func (cc *ClientConn) readHandshakeResponse() error {
 	auth := data[pos : pos+authLen]
 	checkAuth := calcPassword(cc.salt, []byte(cc.server.CfgGetPwd(cc.user)))
 	if !bytes.Equal(auth, checkAuth) && !cc.server.SkipAuth() {
-		return errors.Trace(NewDefaultError(ER_ACCESS_DENIED_ERROR, cc.conn.RemoteAddr().String(), cc.user, "Yes"))
+		return errors.Trace(NewDefaultError(ErAccessDeniedError, cc.conn.RemoteAddr().String(), cc.user, "Yes"))
 	}
 
 	pos += authLen
@@ -273,7 +273,7 @@ func (cc *ClientConn) dispatch(data []byte) error {
 		return cc.handleStmtReset(data)
 	default:
 		msg := fmt.Sprintf("command %d not supported now", cmd)
-		return NewError(ER_UNKNOWN_ERROR, msg)
+		return NewError(ErUnknownError, msg)
 	}
 
 	return nil
@@ -311,10 +311,10 @@ func (cc *ClientConn) writeOK() error {
 }
 
 func (cc *ClientConn) writeError(e error) error {
-	var m *SqlError
+	var m *SQLError
 	var ok bool
-	if m, ok = e.(*SqlError); !ok {
-		m = NewError(ER_UNKNOWN_ERROR, e.Error())
+	if m, ok = e.(*SQLError); !ok {
+		m = NewError(ErUnknownError, e.Error())
 	}
 
 	data := make([]byte, 4, 16+len(m.Message))
