@@ -78,7 +78,7 @@ func (cc *ClientConn) handleStmtExecute(data []byte) (err error) {
 
 	stmt := cc.ctx.GetStatement(int(stmtId))
 	if stmt == nil {
-		return NewDefaultError(ER_UNKNOWN_STMT_HANDLER,
+		return NewDefaultError(ErUnknownStmtHandler,
 			strconv.FormatUint(uint64(stmtId), 10), "stmt_execute")
 	}
 
@@ -86,7 +86,7 @@ func (cc *ClientConn) handleStmtExecute(data []byte) (err error) {
 	pos++
 	//now we only support CURSOR_TYPE_NO_CURSOR flag
 	if flag != 0 {
-		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("unsupported flag %d", flag))
+		return NewError(ErUnknownError, fmt.Sprintf("unsupported flag %d", flag))
 	}
 
 	//skip iteration-count, always 1
@@ -290,7 +290,7 @@ func (cc *ClientConn) handleStmtSendLongData(data []byte) (err error) {
 
 	stmt := cc.ctx.GetStatement(stmtId)
 	if stmt == nil {
-		return NewDefaultError(ER_UNKNOWN_STMT_HANDLER,
+		return NewDefaultError(ErUnknownStmtHandler,
 			strconv.Itoa(stmtId), "stmt_send_longdata")
 	}
 
@@ -306,7 +306,7 @@ func (cc *ClientConn) handleStmtReset(data []byte) (err error) {
 	stmtId := int(binary.LittleEndian.Uint32(data[0:4]))
 	stmt := cc.ctx.GetStatement(stmtId)
 	if stmt == nil {
-		return NewDefaultError(ER_UNKNOWN_STMT_HANDLER,
+		return NewDefaultError(ErUnknownStmtHandler,
 			strconv.Itoa(stmtId), "stmt_reset")
 	}
 	stmt.Reset()

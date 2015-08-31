@@ -515,7 +515,7 @@ func parseRowValuesText(columns []*ColumnInfo, rowData []byte) (values []interfa
 			case TypeString, TypeVarString, TypeVarchar:
 				values[i] = hack.String(v)
 			case TypeBlob, TypeLongBlob, TypeMediumBlob, TypeTinyBlob:
-				if col.Charset != uint16(CharsetIds["binary"]) {
+				if col.Charset != uint16(CharsetIDs["binary"]) {
 					values[i] = hack.String(v)
 				} else {
 					values[i] = v
