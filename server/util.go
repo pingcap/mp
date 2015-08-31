@@ -470,7 +470,7 @@ func dumpRowValuesBinary(alloc arena.ArenaAllocator, columns []*ColumnInfo, row 
 			myTime := Time{v, columns[i].Type, DefaultFsp}
 			data = append(data, dumpBinaryDateTime(myTime, nil)...)
 		case Duration:
-			data = append(data, dumpBinaryTime(time.Duration(v))...)
+			data = append(data, dumpBinaryTime(v.Duration)...)
 		case time.Duration:
 			data = append(data, dumpBinaryTime(v)...)
 		case Decimal:
@@ -565,7 +565,7 @@ func dumpTextValue(mysqlType uint8, value interface{}) ([]byte, error) {
 	case Time:
 		return hack.Slice(v.String()), nil
 	case Duration:
-		return hack.Slice(v.String(DefaultFsp)), nil
+		return hack.Slice(v.String()), nil
 	case Decimal:
 		return hack.Slice(v.String()), nil
 	default:
