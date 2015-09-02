@@ -7,7 +7,7 @@ import (
 	"net"
 
 	"github.com/juju/errors"
-	. "github.com/pingcap/mysqldef"
+	. "github.com/pingcap/tidb/mysqldef"
 )
 
 type PacketIO struct {

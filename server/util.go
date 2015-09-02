@@ -11,7 +11,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
 	"github.com/pingcap/mp/hack"
-	. "github.com/pingcap/mysqldef"
+	. "github.com/pingcap/tidb/mysqldef"
 )
 
 func parseLengthEncodedInt(b []byte) (num uint64, isNull bool, n int) {

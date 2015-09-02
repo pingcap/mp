@@ -10,7 +10,7 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/pingcap/mp/hack"
-	. "github.com/pingcap/mysqldef"
+	. "github.com/pingcap/tidb/mysqldef"
 )
 
 type MysqlDriver struct {
@@ -174,9 +174,12 @@ func (ms *MysqlStatement) sendExecuteCommand(args ...interface{}) error {
 				if v.IsZero() {
 					val = []byte("0000-00-00")
 				} else {
-					val = []byte(FormatDatetime(v))
+					if v.Equal(ZeroTime) {
+						val = []byte("0000-00-00 00:00:00")
+					} else {
+						val = []byte(v.Format(TimeFSPFormat))
+					}
 				}
-
 				paramValues = append(paramValues, dumpLengthEncodedInt(uint64(len(val)))...)
 				paramValues = append(paramValues, val...)
 

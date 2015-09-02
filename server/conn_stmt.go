@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/pingcap/mp/hack"
-	. "github.com/pingcap/mysqldef"
+	. "github.com/pingcap/tidb/mysqldef"
 )
 
 func (cc *ClientConn) handleStmtPrepare(sql string) error {

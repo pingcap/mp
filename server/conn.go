@@ -13,7 +13,7 @@ import (
 	"github.com/ngaut/arena"
 	"github.com/ngaut/log"
 	"github.com/pingcap/mp/hack"
-	. "github.com/pingcap/mysqldef"
+	. "github.com/pingcap/tidb/mysqldef"
 	"github.com/reborndb/go/errors2"
 )
 

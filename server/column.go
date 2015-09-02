@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 
 	"github.com/ngaut/arena"
-	. "github.com/pingcap/mysqldef"
+	. "github.com/pingcap/tidb/mysqldef"
 )
 
 type ColumnInfo struct {
