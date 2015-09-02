@@ -366,6 +366,6 @@ func (cc *ComboContext) GetStatement(stmtId int) IStatement {
 	return cc.stmts[stmtId]
 }
 
-func (cc *ComboContext) FieldList(tableName, wildCard string) (columns []*ColumnInfo, err error) {
-	return cc.mc.FieldList(tableName, wildCard)
+func (cc *ComboContext) FieldList(tableName string) (columns []*ColumnInfo, err error) {
+	return cc.mc.FieldList(tableName)
 }

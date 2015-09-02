@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"runtime"
+	"strings"
 
 	"github.com/juju/errors"
 	"github.com/ngaut/arena"
@@ -361,7 +362,8 @@ func (cc *ClientConn) handleQuery(sql string) (err error) {
 }
 
 func (cc *ClientConn) handleFieldList(sql string) (err error) {
-	columns, err := cc.ctx.FieldList(sql, "")
+	parts := strings.Split(sql, "\x00")
+	columns, err := cc.ctx.FieldList(parts[0])
 	if err != nil {
 		return
 	}

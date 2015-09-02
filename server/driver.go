@@ -17,7 +17,7 @@ type IContext interface {
 	Execute(sql string) (*ResultSet, error)
 	Prepare(sql string) (statement IStatement, columns, params []*ColumnInfo, err error)
 	GetStatement(stmtId int) IStatement
-	FieldList(tableName, wildCard string) (columns []*ColumnInfo, err error)
+	FieldList(tableName string) (columns []*ColumnInfo, err error)
 	Close() error
 }
 
