@@ -12,7 +12,7 @@ import (
 	"github.com/ngaut/log"
 	"github.com/ngaut/tokenlimiter"
 	"github.com/pingcap/mp/etc"
-	"github.com/pingcap/mysqldef"
+	"github.com/pingcap/tidb/mysqldef"
 )
 
 var (
