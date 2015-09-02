@@ -164,9 +164,7 @@ func (tc *TidbContext) Execute(sql string) (rs *ResultSet, err error) {
 }
 
 func (tc *TidbContext) Close() (err error) {
-	//TODO
-	//return tc.session.Close()
-	return
+	return tc.session.Close()
 }
 
 func (tc *TidbContext) FieldList(table, wildCard string) (colums []*ColumnInfo, err error) {
