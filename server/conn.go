@@ -363,11 +363,7 @@ func (cc *ClientConn) handleQuery(sql string) (err error) {
 
 func (cc *ClientConn) handleFieldList(sql string) (err error) {
 	parts := strings.Split(sql, "\x00")
-	wildCard := ""
-	if len(parts) == 2 {
-		wildCard = parts[1]
-	}
-	columns, err := cc.ctx.FieldList(parts[0], wildCard)
+	columns, err := cc.ctx.FieldList(parts[0])
 	if err != nil {
 		return
 	}

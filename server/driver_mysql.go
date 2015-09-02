@@ -501,8 +501,8 @@ func (mc *MysqlConn) Execute(command string) (*ResultSet, error) {
 	return mc.exec(command)
 }
 
-func (mc *MysqlConn) FieldList(table string, wildcard string) ([]*ColumnInfo, error) {
-	if err := mc.writeCommandStrStr(byte(ComFieldList), table, wildcard); err != nil {
+func (mc *MysqlConn) FieldList(table string) ([]*ColumnInfo, error) {
+	if err := mc.writeCommandStrStr(byte(ComFieldList), table, ""); err != nil {
 		return nil, err
 	}
 

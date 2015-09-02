@@ -167,7 +167,7 @@ func (tc *TidbContext) Close() (err error) {
 	return tc.session.Close()
 }
 
-func (tc *TidbContext) FieldList(table, wildCard string) (colums []*ColumnInfo, err error) {
+func (tc *TidbContext) FieldList(table string) (colums []*ColumnInfo, err error) {
 	rs, err := tc.Execute("SELECT * FROM " + table + " LIMIT 0")
 	if err != nil {
 		return
